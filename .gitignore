@@ -1,0 +1,50 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging / PyInstaller
+build/
+dist/
+*.egg-info/
+*.egg
+*.spec
+
+# Environments
+.env
+.venv/
+venv/
+ENV/
+env/
+
+# Moonshine / Local model weights & caches
+*.onnx
+*.ort
+models/
+
+# Logs & temp files
+*.log
+*.tmp
+temp/
+tmp/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Operating System Files
+[Dd]esktop.ini
+Thumbs.db
+ehthumbs.db
+$RECYCLE.BIN/
+
+# Editor / IDE directories
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

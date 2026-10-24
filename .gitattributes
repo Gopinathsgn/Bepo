@@ -1,2 +1,31 @@
-# Auto detect text files and perform LF normalization
+# Auto-detect text files and normalize line endings
 * text=auto
+
+# Source files (LF line endings & syntax diff drivers)
+*.py text eol=lf diff=python
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Windows scripts (strictly require CRLF to run correctly on cmd/PowerShell)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Image and media assets (prevent line ending conversion or corruption)
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.svg text eol=lf
+
+# Compiled binaries and machine learning models
+*.exe binary
+*.dll binary
+*.onnx binary
+*.ort binary
+*.bin binary

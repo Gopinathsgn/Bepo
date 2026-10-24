@@ -1,0 +1,12 @@
+{
+  "hotkey_toggle": "ctrl+win",
+  "hotkey_ptt": "ctrl+space",
+  "continuous_mode": true,
+  "filter_filler_words": true,
+  "enable_emojis": true,
+  "safety_idle_timeout_seconds": 180.0,
+  "auto_stop_on_pause": false,
+  "pause_duration_seconds": 2.0,
+  "esc_to_finish": true,
+  "clipboard_safety_net": false
+}
