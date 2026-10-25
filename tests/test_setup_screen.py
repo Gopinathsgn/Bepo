@@ -127,6 +127,17 @@ class BehaviourTests(unittest.TestCase):
             screen.close()
         quit_app.assert_called_once()
 
+    def test_closing_during_a_download_stops_the_download_thread_first(self):
+        screen = SetupScreen()
+        thread = mock.MagicMock()
+        thread.isRunning.return_value = True
+        thread.wait.return_value = False          # stuck in network I/O
+        screen._download_thread = thread
+        with mock.patch.object(ss.QApplication, "quit"):
+            screen.close()
+        thread.requestInterruption.assert_called_once()
+        thread.terminate.assert_called_once()
+
     def test_quit_button_quits(self):
         with mock.patch.object(ss.QApplication, "quit") as quit_app:      # patch before the button is wired
             screen = SetupScreen()

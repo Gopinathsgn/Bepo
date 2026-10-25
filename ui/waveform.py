@@ -49,9 +49,9 @@ class WaveformWidget(QWidget):
             self._randomize_targets()
             self._timer.start()
         else:
-            self._timer.stop()
+            # Keep animating until the bars have settled back to idle (_tick stops the timer then)
             self._target_heights = [IDLE_HEIGHT] * BAR_COUNT
-            self._tick()   # one final smooth step
+            self._timer.start()
 
     def set_level(self, level: float):
         """level: 0..1 from audio RMS"""
@@ -83,10 +83,13 @@ class WaveformWidget(QWidget):
             if abs(diff) > 0.5:
                 self._heights[i] += diff * 0.45   # smooth lerp
                 changed = True
-            else:
+            elif self._heights[i] != self._target_heights[i]:
                 self._heights[i] = self._target_heights[i]
+                changed = True
         if changed:
             self.update()
+        elif not self._active:
+            self._timer.stop()   # fully collapsed to idle
 
     def paintEvent(self, event):
         painter = QPainter(self)

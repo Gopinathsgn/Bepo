@@ -360,7 +360,7 @@ class SettingsDialog(QDialog):
         self.model_combo = QComboBox()
         for key, info in MODELS.items():
             self.model_combo.addItem(f"{info.label} — {info.size_mb} MB", key)
-        lay.addLayout(self._labeled("Speech model", self.model_combo))
+        lay.addLayout(self._labeled("Moonshine model", self.model_combo))
         self.model_hint = self._hint("")
         lay.addWidget(self.model_hint)
         self.speed_combo = QComboBox()

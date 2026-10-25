@@ -24,6 +24,7 @@
 
 <p align="center">
   <a href="#-features">Features</a> •
+  <a href="#-why-moonshine">Why Moonshine</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-keyboard-shortcuts--usage">Usage</a> •
   <a href="#-voice-deletion--editing-commands">Voice Deletion</a> •
@@ -97,6 +98,37 @@ How Bepo compares to existing dictation tools and models:
 | **Push-to-Talk (`Ctrl + Space`)** | ✅ **Instant & Native** | ⚠️ Clunky or unsupported | ❌ No | ❌ No |
 | **Streaming Response** | **Live sub-second word streaming** | ⚠️ Noticeable lag (Waits for full audio buffer) | Variable (Dependent on network ping) | 500ms – 2000ms |
 | **Overlay UI Quality** | **Floating Glass Pill** | Bulky Electron / Cluttered UI | Rigid Windows bar | None / Browser view |
+
+---
+
+## 🧠 Why Moonshine?
+
+*"Whisper Large V3 and NVIDIA NeMo models are top-tier — why doesn't Bepo use them?"*
+
+Because Bepo is a background tool for ordinary laptops. It has to sit in your tray, type the moment you speak, and never need a GPU, gigabytes of RAM or a fan that spins up. [Moonshine](https://github.com/moonshine-ai/moonshine) is built for exactly that: small, CPU-first, and streaming.
+
+| | Moonshine streaming (Bepo) | Whisper Large V3 |
+|---|---|---|
+| **Download size** | **45 – 269 MB** (Tiny / Small / Medium) | ≈ 3 GB of weights |
+| **Memory while loaded** | **≈ 90 – 320 MB**, handed back to Windows when idle | Several GB; ≈ 10 GB of VRAM is the usual guideline for the reference implementation |
+| **GPU needed?** | **No** — runs on a normal CPU through ONNX Runtime | Practically yes for real-time use |
+| **Live streaming** | **Yes** — caches work between updates, so words appear as you speak | No — always processes a fixed 30-second window |
+| **English accuracy** ¹ | Medium **6.65 %**, Small 7.84 %, Tiny 12.0 % word error rate | 7.44 % word error rate |
+| **Languages** | English only in Bepo | Many |
+
+¹ Average word error rate over the Open ASR benchmark sets (AMI meetings, Earnings-22, GigaSpeech, LibriSpeech, SPGISpeech, TED-LIUM, VoxPopuli), as published by Moonshine in its [streaming paper](https://arxiv.org/abs/2602.12241) and [docs](https://moonshine-voice.readthedocs.io/en/latest/moonshine-vs-whisper/) — vendor figures, not Bepo's own tests. These sets are much harder than ordinary dictation (meetings, phone-style audio), so real-world error rates on clear speech are lower: all three models scored about 2 % on Bepo's own clean read-aloud test. Bepo's measured size, memory and CPU numbers are in [Performance](#-performance--resource-use).
+
+**In short**
+- **Light:** the default Small model needs about 142 MB on disk and about 175 MB of RAM, and Bepo trims even that after 15 idle seconds.
+- **Fast to respond:** Moonshine's own benchmarks put its response latency around 0.1 s, against roughly 11 s for Whisper Large V3 on the same laptop. In Bepo, a finished sentence is typed about half a second after you stop speaking.
+- **No GPU required:** it works on integrated graphics and older CPUs. It does use real CPU while you speak (about 1.4 – 2 cores on the Small model in our tests) and almost none the rest of the time.
+- **Accurate enough to prefer:** Moonshine Medium Streaming matches or beats Whisper Large V3 on English in Moonshine's benchmarks with roughly a sixth of the parameters.
+
+**What about NVIDIA NeMo (Parakeet / Canary)?** They are excellent, and models such as Parakeet can run on a CPU through ONNX exports. They are still larger (hundreds of millions to a billion parameters, with GB-scale weights) and the NeMo toolkit itself is built around PyTorch and NVIDIA GPUs, which is the opposite of a small, drop-in Windows tray app.
+
+**When Whisper is the better tool:** you need many languages, or you are batch-transcribing recordings on a GPU. Bepo is deliberately narrower: English, live, local and light.
+
+**Will Bepo switch models if a better one comes along?** Moonshine's models are fantastic, and Bepo's goal is a small memory footprint with reasonable accuracy. If a model fits that goal better, I'll gladly switch when I have the time. — Gopinath
 
 ---
 
@@ -321,7 +353,7 @@ Right-click the Bepo tray icon → **Settings**. Everything applies the moment y
 |---|---|
 | **Shortcuts** | Click a box and press the new combination for *Start / stop dictation* and *Push-to-talk*; disable either one; choose whether `Esc` finishes dictation. |
 | **Dictation** | Type sentence by sentence while you speak, remove filler words, spoken emoji, spoken line breaks and lists (with the line-break key), optional auto-finish after a pause, and how long silence is tolerated before the microphone is released. |
-| **Speech recognition** | **Speech model** (Tiny / Small / Medium — a model you haven't used yet is downloaded when you Save), **Responsiveness** (Efficient or Fast), **Microphone** (any input device instead of the Windows default) and **Custom words** (names and jargon Bepo should prefer). |
+| **Speech recognition** | **Moonshine model** (Tiny / Small / Medium — a model you haven't used yet is downloaded when you Save), **Responsiveness** (Efficient or Fast), **Microphone** (any input device instead of the Windows default) and **Custom words** (names and jargon Bepo should prefer). |
 | **System & privacy** | Start Bepo when you sign in to Windows, and the optional clipboard safety net. |
 
 Your choices are saved to `%LOCALAPPDATA%\Bepo\config.json` (outside the install folder, so updates never overwrite them). Only values that differ from the defaults are written. **Restore defaults** resets the window to the shipped defaults.

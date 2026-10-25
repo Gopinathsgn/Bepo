@@ -326,10 +326,20 @@ class SetupScreen(QWidget):
         self.hide()
         self.setup_complete.emit()
 
+    def _stop_download(self):
+        """Don't exit with the download thread still running ("QThread: Destroyed while thread is running")."""
+        thread = self._download_thread
+        if thread is not None and thread.isRunning():
+            thread.requestInterruption()
+            if not thread.wait(1500):
+                thread.terminate()      # blocked in network I/O; the app is exiting anyway
+                thread.wait(500)
+
     def closeEvent(self, event):
         """Closing the setup window before it finishes (Alt+F4) exits the app instead of
         leaving an invisible background process that blocks the next launch."""
         if not self._finished:
+            self._stop_download()
             QApplication.quit()
         super().closeEvent(event)
 
