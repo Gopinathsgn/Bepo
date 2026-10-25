@@ -4,6 +4,7 @@ Bepo — Blazing fast voice typing for Windows.
 Wires together: setup screen, system tray, settings, hotkey, transcriber, pill, injector.
 """
 
+import re
 import sys
 import logging
 from pathlib import Path
@@ -28,6 +29,7 @@ from core.transcriber import TranscriberThread
 from core.injector import configure as configure_injector, enqueue_injection, enqueue_deletion
 from core.cleaner import clean_transcript
 from core.commands import CommandType, parse_voice_command
+from core.formatting import BULLETS, NUMBERED, FormatCommand, ListState, parse_format_command
 from core.hotkey import HotkeyManager, DEFAULT_TOGGLE, DEFAULT_PTT
 from ui.pill import PillWindow
 from ui.setup_screen import SetupScreen
@@ -163,6 +165,8 @@ class BepoApp(QObject):
         # Session tracking for continuous streaming
         self._session_injected_text: str = ""
         self._session_segments: list[str] = []
+        self._session_segment_states: list[tuple] = []   # list state before each segment (for "scratch that")
+        self._list = ListState()
         self._session_segments_count: int = 0
         self._session_handled_segments: int = 0   # utterances processed live (any outcome)
         self._session_had_output: bool = False    # something was typed or a voice command ran
@@ -224,11 +228,12 @@ class BepoApp(QObject):
         self._continuous_mode = c["continuous_mode"]
         self._filter_fillers = c["filter_filler_words"]
         self._enable_emojis = c["enable_emojis"]
+        self._voice_formatting = c["voice_formatting"]
         self._safety_idle_timeout = c["safety_idle_timeout_seconds"]
         self._auto_stop_on_pause = c["auto_stop_on_pause"]
         self._pause_seconds = c["pause_duration_seconds"]
         self._esc_to_finish = c["esc_to_finish"]
-        configure_injector(clipboard_safety_net=c["clipboard_safety_net"])
+        configure_injector(clipboard_safety_net=c["clipboard_safety_net"], line_break_key=c["line_break_key"])
 
     # ------------------------------------------------------------------ #
     # Hotkey handlers (marshalled to Qt main thread)                      #
@@ -282,6 +287,8 @@ class BepoApp(QObject):
         self._has_spoken = False
         self._session_injected_text = ""
         self._session_segments = []
+        self._session_segment_states = []
+        self._list.reset()
         self._session_segments_count = 0
         self._session_handled_segments = 0
         self._session_had_output = False
@@ -367,6 +374,12 @@ class BepoApp(QObject):
             # Self-cancelled in-flight (e.g. "We will meet at six. Scratch that.")
             return
 
+        if self._voice_formatting:
+            layout_cmd = parse_format_command(remaining)
+            if layout_cmd is not None:
+                self._handle_format_command(layout_cmd)
+                return
+
         cleaned = clean_transcript(
             remaining,
             filter_fillers=self._filter_fillers,
@@ -376,25 +389,46 @@ class BepoApp(QObject):
             logging.info("[Bepo] Filtered out hesitation filler (%d chars)", len(raw_text))
             return
 
-        # Smart inter-sentence spacing
-        to_inject = cleaned
-        if self._session_injected_text:
-            prev = self._session_injected_text
-            if not prev[-1].isspace() and to_inject[0] not in ".,!?;:)]}":
-                to_inject = " " + to_inject
-
-        self._session_segments.append(to_inject)
-        self._session_injected_text += to_inject
-        self._session_segments_count += 1
-        self._session_had_output = True
-
-        # Enqueue text for sequential background injection (safe against interleaving)
-        enqueue_injection(to_inject, self._session_injected_text)
+        # Smart spacing between sentences, plus list markers while a list is open
+        state_before = self._list.snapshot()
+        to_inject = self._list.compose(cleaned, self._session_injected_text)
+        self._type_segment(to_inject, state_before)
 
         # Confirm injected sentence on pill without closing
         self._pill.notify_sentence_injected(cleaned)
 
         # Reset inactivity timer
+        if self._recording and self._continuous_mode:
+            self._idle_timer.start(int(self._safety_idle_timeout * 1000))
+
+    def _type_segment(self, text: str, state_before: tuple):
+        """Record `text` as the latest segment of this session and queue it for typing."""
+        self._session_segments.append(text)
+        self._session_segment_states.append(state_before)
+        self._session_injected_text += text
+        self._session_segments_count += 1
+        self._session_had_output = True
+        # Enqueue text for sequential background injection (safe against interleaving)
+        enqueue_injection(text, self._session_injected_text)
+
+    def _handle_format_command(self, command: FormatCommand):
+        """Execute a spoken layout command: line breaks and numbered / bulleted lists."""
+        logging.info("[Bepo] Executing layout command: %s", command.name)
+        self._session_had_output = True
+
+        if command in (FormatCommand.NEW_LINE, FormatCommand.NEW_PARAGRAPH):
+            paragraph = command == FormatCommand.NEW_PARAGRAPH
+            self._type_segment("\n\n" if paragraph else "\n", self._list.snapshot())
+            self._pill.notify_status("New paragraph ↵" if paragraph else "New line ↵")
+        elif command in (FormatCommand.START_NUMBERED, FormatCommand.START_BULLETS):
+            numbered = command == FormatCommand.START_NUMBERED
+            self._list.start(NUMBERED if numbered else BULLETS)
+            self._pill.notify_status("Numbered list" if numbered else "Bullet list")
+        elif command == FormatCommand.NEXT_ITEM:
+            self._pill.notify_status("Next item" if self._list.next_item() else "No list started")
+        elif command == FormatCommand.END_LIST:
+            self._pill.notify_status("List ended" if self._list.end() else "No list started")
+
         if self._recording and self._continuous_mode:
             self._idle_timer.start(int(self._safety_idle_timeout * 1000))
 
@@ -409,11 +443,12 @@ class BepoApp(QObject):
         if cmd_type == CommandType.SCRATCH_THAT:
             if self._session_segments:
                 last_chunk = self._session_segments.pop()
+                self._list.restore(self._session_segment_states.pop())
                 chars_to_delete = len(last_chunk)
                 self._session_injected_text = "".join(self._session_segments)
                 self._session_segments_count = len(self._session_segments)
                 enqueue_deletion(chars_to_delete, self._session_injected_text)
-                preview = last_chunk.strip()
+                preview = last_chunk.strip() or "line break"
                 preview = preview[-16:] if len(preview) > 16 else preview
                 self._pill.notify_deleted(f"Deleted \"{preview}\" ⌫")
                 _play_earcon("delete")
@@ -428,19 +463,24 @@ class BepoApp(QObject):
         elif cmd_type == CommandType.DELETE_WORDS:
             if self._session_injected_text:
                 current = self._session_injected_text.rstrip()
-                words = current.split()
+                words = list(re.finditer(r"\S+", current))
                 if words:
                     num_to_drop = min(count, len(words))
-                    kept_words = words[:-num_to_drop]
-                    if kept_words:
-                        new_text = " ".join(kept_words)
-                        chars_to_delete = len(self._session_injected_text) - len(new_text)
-                        self._session_injected_text = new_text
-                        self._session_segments = [new_text]
+                    # Cut at the start of the first dropped word; keep any line breaks before it
+                    kept = current[:words[-num_to_drop].start()].rstrip(" \t")
+                    chars_to_delete = len(self._session_injected_text) - len(kept)
+                    first_state = self._session_segment_states[0] if self._session_segment_states else None
+                    if kept.strip():
+                        self._session_injected_text = kept
+                        self._session_segments = [kept]
+                        self._session_segment_states = [first_state] if first_state else []
                     else:
                         chars_to_delete = len(self._session_injected_text)
                         self._session_injected_text = ""
                         self._session_segments.clear()
+                        self._session_segment_states.clear()
+                        if first_state:
+                            self._list.restore(first_state)
                     self._session_segments_count = len(self._session_segments)
                     enqueue_deletion(chars_to_delete, self._session_injected_text)
                     w_str = f"{num_to_drop} word{'s' if num_to_drop > 1 else ''}"
@@ -451,7 +491,10 @@ class BepoApp(QObject):
             if self._session_injected_text:
                 chars_to_delete = len(self._session_injected_text)
                 self._session_injected_text = ""
+                if self._session_segment_states:
+                    self._list.restore(self._session_segment_states[0])
                 self._session_segments.clear()
+                self._session_segment_states.clear()
                 self._session_segments_count = 0
                 enqueue_deletion(chars_to_delete, "")
                 self._pill.notify_deleted("Cleared all ⌫")

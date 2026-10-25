@@ -86,8 +86,18 @@ class RoundTripTests(DialogTestCase):
         cfg = config.normalize({"hotkey_ptt": "", "custom_vocabulary": ["Bepo"], "microphone": "Mic B",
                                 "speech_model": "tiny", "responsiveness": "fast",
                                 "safety_idle_timeout_seconds": 90, "pause_duration_seconds": 3.0,
-                                "auto_stop_on_pause": True, "continuous_mode": False})
+                                "auto_stop_on_pause": True, "continuous_mode": False,
+                                "voice_formatting": False, "line_break_key": "enter"})
         self.assertEqual(self.make(cfg).collect(), cfg)
+
+    def test_line_break_key_is_only_available_with_spoken_formatting(self):
+        d = self.make()
+        d.formatting_check.setChecked(False)
+        self.assertFalse(d.line_break_combo.isEnabled())
+        d.formatting_check.setChecked(True)
+        self.assertTrue(d.line_break_combo.isEnabled())
+        d.line_break_combo.setCurrentIndex(d.line_break_combo.findData("enter"))
+        self.assertEqual(d.collect()["line_break_key"], "enter")
 
     def test_saving_emits_the_config_and_startup_choice_and_closes(self):
         d = self.make(startup=False)

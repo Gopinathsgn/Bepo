@@ -67,6 +67,7 @@ graph TD
 | [`main.py`](main.py) | Application Lifecycle & Hub | `BepoApp`, `main()`, `_make_tray_icon` | Coordinates all sub-components, connects all Qt signals, applies settings live (`apply_settings`), schedules the idle memory trim. **Import order matters:** `bootstrap.early_start()` runs before the PySide6 imports (see §8). |
 | [`core/transcriber.py`](core/transcriber.py) | Dictation Sessions | `TranscriberThread` | Qt-facing wrapper: loads/reloads the model on a background thread, opens and **closes** a microphone session per dictation, applies settings at runtime. Emits `ready`, `loading`, `partial_text`, `segment_text`, `final_text`, `error`. Call `start_loading()` only after connecting signals. |
 | [`core/engine.py`](core/engine.py) | Speech Engine (no Qt) | `EngineSettings`, `load_transcriber()`, `open_session()`, `Preloader` | All Moonshine specifics: model loading, per-dictation `MicTranscriber` on a shared model, key terms, early preload thread. |
+| [`core/formatting.py`](core/formatting.py) | Spoken Layout (no Qt) | `parse_format_command()`, `ListState` | Whole-utterance "new line / numbered list / next item / end list" commands and the list state machine (`compose()` decides marker, line break or space). Gated by `voice_formatting`. |
 | [`core/config.py`](core/config.py) | Settings (no Qt) | `DEFAULT_CONFIG`, `normalize()`, `load_config()`, `save_user_config()` | Single source of truth for settings: defaults, validation, merging bundled + user config, saving only non-default values. |
 | [`core/bootstrap.py`](core/bootstrap.py) | Early Start-up (no Qt) | `early_start()` | Logging, single-instance mutex, model preload — run before Qt is imported so the model loads in parallel with the UI. |
 | [`core/audio_devices.py`](core/audio_devices.py) | Microphone List | `list_input_devices()`, `resolve_device()` | Input devices of the default host API; saved device name -> index (falls back to the system default if unplugged). |
@@ -152,6 +153,13 @@ stateDiagram-v2
 
 ### 3b. Live Session vs. Final Transcript
 - In continuous toggle mode every utterance is handled live (`_on_segment`): typed, executed as a voice command, or dropped. The transcriber's final text still contains sentences that were typed and later deleted (and the delete commands themselves), so `_on_final` must **not** re-parse it when `_session_handled_segments > 0`. Only PTT, non-continuous mode, or a session where nothing was handled live injects the full transcript.
+
+### 3c. Line Breaks & List State
+- `
+` in injected text is sent as a real Enter/Shift+Enter keystroke (`injector._send_text`), never as a Unicode `
+` (many apps ignore it). `line_break_key` (`shift_enter` default, so chat boxes never send) is applied via `injector.configure()`.
+- Every typed segment records the `ListState` snapshot from *before* it (`_session_segment_states`, parallel to `_session_segments`). "Scratch that", "Delete all" and "Delete last word" restore it so numbering stays correct; keep both lists in sync when adding anything that edits `_session_segments`.
+- Layout commands only work live (continuous toggle mode). The full-transcript path (PTT / non-continuous) types text as spoken.
 
 ### 4. Windows 11 DWM Effects & Focus
 - The setup screen and About dialog use `DwmSetWindowAttribute` with:

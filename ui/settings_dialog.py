@@ -334,6 +334,16 @@ class SettingsDialog(QDialog):
         lay.addWidget(self.fillers_check)
         self.emoji_check = QCheckBox('Turn spoken emoji into symbols ("thumbs up emoji" → 👍)')
         lay.addWidget(self.emoji_check)
+        self.formatting_check = QCheckBox('Spoken line breaks and lists ("new line", "numbered list")')
+        lay.addWidget(self.formatting_check)
+        self.line_break_combo = QComboBox()
+        self.line_break_combo.addItem("Shift+Enter — safe in chat boxes", "shift_enter")
+        self.line_break_combo.addItem("Enter — new list items in Word, Docs, Notion", "enter")
+        lay.addLayout(self._labeled("   Line break key", self.line_break_combo))
+        self.formatting_hint = self._hint(
+            'Say "numbered list" or "bullet list", pause, then speak the first item. Say "next item" '
+            'for each new one and "end list" to finish. Only while typing sentence by sentence.')
+        lay.addWidget(self.formatting_hint)
         self.autostop_check = QCheckBox("Finish automatically after a pause")
         lay.addWidget(self.autostop_check)
         self.pause_combo = QComboBox()
@@ -423,6 +433,7 @@ class SettingsDialog(QDialog):
         outer.addWidget(footer)
 
         # Reactions
+        self.formatting_check.toggled.connect(self._update_enabled)
         self.continuous_check.toggled.connect(self._update_enabled)
         self.autostop_check.toggled.connect(self._update_enabled)
         self.model_combo.currentIndexChanged.connect(self._update_model_hint)
@@ -471,6 +482,8 @@ class SettingsDialog(QDialog):
         self.continuous_check.setChecked(cfg["continuous_mode"])
         self.fillers_check.setChecked(cfg["filter_filler_words"])
         self.emoji_check.setChecked(cfg["enable_emojis"])
+        self.formatting_check.setChecked(cfg["voice_formatting"])
+        self.line_break_combo.setCurrentIndex(self.line_break_combo.findData(cfg["line_break_key"]))
         self.autostop_check.setChecked(cfg["auto_stop_on_pause"])
         self._fill_choice_combo(self.pause_combo, PAUSE_SECOND_CHOICES, cfg["pause_duration_seconds"],
                                 lambda v: f"{v:g} seconds")
@@ -492,6 +505,8 @@ class SettingsDialog(QDialog):
         self.autostop_check.setEnabled(not continuous)
         self.pause_combo.setEnabled(not continuous and self.autostop_check.isChecked())
         self.autostop_hint.setVisible(continuous)
+        self.line_break_combo.setEnabled(self.formatting_check.isChecked())
+        self.formatting_hint.setVisible(self.formatting_check.isChecked())
 
     def _update_model_hint(self, *_):
         key = self.model_combo.currentData()
@@ -517,6 +532,8 @@ class SettingsDialog(QDialog):
         cfg["continuous_mode"] = self.continuous_check.isChecked()
         cfg["filter_filler_words"] = self.fillers_check.isChecked()
         cfg["enable_emojis"] = self.emoji_check.isChecked()
+        cfg["voice_formatting"] = self.formatting_check.isChecked()
+        cfg["line_break_key"] = self.line_break_combo.currentData()
         cfg["auto_stop_on_pause"] = self.autostop_check.isChecked()
         cfg["pause_duration_seconds"] = self.pause_combo.currentData()
         minutes = self.idle_combo.currentData()

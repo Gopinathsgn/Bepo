@@ -72,6 +72,7 @@ Unlike traditional cloud voice assistants, Bepo runs **Moonshine AI's quantized 
 | ⌫ **Voice Deletion Commands** | Speak commands like *"Scratch that"*, *"Delete last word"*, or *"Clear all"* to instantly erase typed words. |
 | 🎙️ **Dual Input Modes** | **Toggle Mode** (`Ctrl + Win`) for hands-free streaming and **Push-to-Talk** (`Ctrl + Space`) for quick replies. |
 | 🧹 **Filler Word Filter** | Automatically scrubs vocal hesitations (`um`, `uh`, `erm`, `er`, `ah`, `hmm`) for clean, professional transcripts. |
+| 📝 **Line Breaks & Lists** | Say *"new line"*, or *"numbered list"* / *"bullet list"* then *"next item"* and *"end list"* to lay out lists by voice. |
 | 😊 **Spoken Emoji Dictation** | Speak emojis naturally (*"fire emoji"* → 🔥, *"thumbs up emoji"* → 👍, *"rocket emoji"* → 🚀) with zero false positives. |
 | 🪟 **Floating Glass Overlay** | Minimalist always-on-top pill with a dark translucent glass look, soft shadow, and smooth slide animations. It never steals focus. |
 | 🌊 **Speech Indicator** | Animated 7-bar waveform that shows when your speech is being recognised. |
@@ -177,6 +178,32 @@ Correct mistakes seamlessly hands-free using natural voice commands:
 
 ---
 
+## 📝 Line Breaks & Lists
+
+Lay out what you dictate without touching the keyboard. Say the command as its own phrase and pause briefly:
+
+| Command | What happens |
+|---|---|
+| **`"New line"`** / **`"New paragraph"`** | Types a line break / a blank line. |
+| **`"Numbered list"`** (or *"Bullet list"*) | Starts a list: whatever you say next becomes item `1.` (or `- `), on its own line. |
+| **`"Next item"`** | The next thing you say starts item `2.`, `3.`, … A pause in the middle of an item does *not* split it. |
+| **`"End list"`** | Leaves list mode; the next sentence starts on a fresh line. |
+
+*Example:* "Shopping list. **Numbered list.** Buy milk. **Next item.** Buy eggs. **End list.**" types:
+
+```
+Shopping list.
+1. Buy milk.
+2. Buy eggs.
+```
+
+- **"Scratch that"** takes back a whole list item together with its number, and *"Delete last word"* keeps line breaks intact.
+- Line breaks are typed as **Shift+Enter** by default so they never send a chat message. Word, Google Docs and Notion may continue a list on their own after a plain Enter, so if you prefer new list items there, switch **Settings → Dictation → Line break key** to *Enter*. Turn the whole feature off with *Spoken line breaks and lists*.
+- Works while typing sentence by sentence (the default). Push-to-talk and *finish at the end* modes type your sentences as spoken, without layout commands.
+- Like the editing commands, these only trigger when they are the whole phrase: *"The numbered list is long"* is typed as normal text.
+
+---
+
 ## 😊 Spoken Emoji Dictation
 
 Bepo recognizes over 100+ popular emojis spoken naturally. Just say the description followed by **`emoji`** (or `emoticon`):
@@ -258,6 +285,7 @@ bepo/
 │   ├── commands.py          # Voice deletion & editing command parser ("Scratch that", etc.)
 │   ├── config.py            # Settings: defaults, validation, load/save (pure Python)
 │   ├── emoji.py             # Spoken emoji parser (100+ native Unicode glyphs)
+│   ├── formatting.py        # "New line", "Numbered list", "Next item" ... (layout commands + list state)
 │   ├── engine.py            # Loads the Moonshine model, opens per-dictation mic sessions
 │   ├── hotkey.py            # Configurable Win32 RegisterHotKey shortcuts & PTT release watcher
 │   ├── injector.py          # Win32 SendInput Unicode injector with sequential queue
@@ -292,7 +320,7 @@ Right-click the Bepo tray icon → **Settings**. Everything applies the moment y
 | Section | What you can change |
 |---|---|
 | **Shortcuts** | Click a box and press the new combination for *Start / stop dictation* and *Push-to-talk*; disable either one; choose whether `Esc` finishes dictation. |
-| **Dictation** | Type sentence by sentence while you speak, remove filler words, spoken emoji, optional auto-finish after a pause, and how long silence is tolerated before the microphone is released. |
+| **Dictation** | Type sentence by sentence while you speak, remove filler words, spoken emoji, spoken line breaks and lists (with the line-break key), optional auto-finish after a pause, and how long silence is tolerated before the microphone is released. |
 | **Speech recognition** | **Speech model** (Tiny / Small / Medium — a model you haven't used yet is downloaded when you Save), **Responsiveness** (Efficient or Fast), **Microphone** (any input device instead of the Windows default) and **Custom words** (names and jargon Bepo should prefer). |
 | **System & privacy** | Start Bepo when you sign in to Windows, and the optional clipboard safety net. |
 

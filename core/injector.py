@@ -22,12 +22,15 @@ import pyperclip
 
 # Opt-in: also copy the accumulated dictation to the clipboard (see configure()).
 _clipboard_safety_net = False
+# How a spoken "new line" is typed: Shift+Enter (safe in chat boxes) or a plain Enter.
+_line_break_shift = True
 
 
-def configure(clipboard_safety_net: bool = False) -> None:
-    """Apply user settings. Called once by the app controller at start-up."""
-    global _clipboard_safety_net
+def configure(clipboard_safety_net: bool = False, line_break_key: str = "shift_enter") -> None:
+    """Apply user settings. Called by the app controller at start-up and whenever settings change."""
+    global _clipboard_safety_net, _line_break_shift
     _clipboard_safety_net = bool(clipboard_safety_net)
+    _line_break_shift = line_break_key != "enter"
 
 
 # ---------------------------------------------------------------------- #
@@ -40,6 +43,8 @@ KEYEVENTF_KEYUP   = 0x0002
 VK_CONTROL        = 0x11
 VK_V              = 0x56
 VK_BACK           = 0x08
+VK_RETURN         = 0x0D
+VK_SHIFT          = 0x10
 VK_SPACE          = 0x20
 
 # Keys that would turn typed characters into shortcuts (Ctrl+x, Win+x, ...) if they were
@@ -129,6 +134,32 @@ def _send_unicode_string(text: str) -> bool:
     arr = (INPUT * len(inputs))(*inputs)
     sent = user32.SendInput(len(inputs), arr, ctypes.sizeof(INPUT))
     return sent == len(inputs)
+
+
+def _send_line_break() -> bool:
+    """Press Enter (or Shift+Enter, see configure()) once."""
+    user32 = ctypes.windll.user32
+    keys = [(VK_RETURN, 0), (VK_RETURN, KEYEVENTF_KEYUP)]
+    if _line_break_shift:
+        keys = [(VK_SHIFT, 0)] + keys + [(VK_SHIFT, KEYEVENTF_KEYUP)]
+    inputs = [
+        INPUT(type=INPUT_KEYBOARD, union=_INPUTunion(
+            ki=KEYBDINPUT(wVk=vk, wScan=0, dwFlags=flags, time=0, dwExtraInfo=0)))
+        for vk, flags in keys
+    ]
+    arr = (INPUT * len(inputs))(*inputs)
+    return user32.SendInput(len(inputs), arr, ctypes.sizeof(INPUT)) == len(inputs)
+
+
+def _send_text(text: str) -> bool:
+    """Type `text`; each newline becomes a real line-break keystroke (a Unicode newline is ignored by many apps)."""
+    ok = True
+    for index, line in enumerate(text.replace("\r\n", "\n").split("\n")):
+        if index > 0:
+            ok = _send_line_break() and ok
+        if line:
+            ok = _send_unicode_string(line) and ok
+    return ok
 
 
 def _release_held_keys() -> None:
@@ -222,7 +253,7 @@ def inject_text(text: str, full_session_text: str | None = None) -> bool:
 
     # 1. SendInput (Unicode with UTF-16 surrogates)
     try:
-        if _send_unicode_string(text):
+        if _send_text(text):
             logging.info("[Injector] Injected %d characters via SendInput", len(text))
             return True
     except Exception as exc:

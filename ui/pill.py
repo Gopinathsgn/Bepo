@@ -262,6 +262,10 @@ class PillWindow(QWidget):
         Called when a voice deletion command executes.
         Displays deletion confirmation on the pill while keeping it listening seamlessly.
         """
+        self.notify_status(label)
+
+    def notify_status(self, label: str):
+        """Briefly shows a short confirmation (e.g. a layout command) while staying in listening mode."""
         if self._state != PillState.IDLE:
             self._set_state(PillState.LISTENING)
             self._text_label.setText(label)

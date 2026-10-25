@@ -22,6 +22,13 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual(config.update_interval(cfg), 1.0)
         self.assertEqual(cfg["speech_model"], "small")
 
+    def test_line_break_and_formatting_settings(self):
+        self.assertTrue(config.normalize({})["voice_formatting"])
+        self.assertEqual(config.normalize({})["line_break_key"], "shift_enter")
+        self.assertEqual(config.normalize({"line_break_key": "enter"})["line_break_key"], "enter")
+        self.assertEqual(config.normalize({"line_break_key": "tab"})["line_break_key"], "shift_enter")
+        self.assertFalse(config.normalize({"voice_formatting": False})["voice_formatting"])
+
     def test_bad_values_fall_back_to_defaults(self):
         cfg = config.normalize({
             "continuous_mode": "maybe", "safety_idle_timeout_seconds": "soon",

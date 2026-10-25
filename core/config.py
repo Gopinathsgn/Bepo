@@ -29,6 +29,9 @@ BUNDLED_CONFIG_PATH = _app_root() / "config.json"
 
 MODEL_CHOICES = ("tiny", "small", "medium")
 
+# How a spoken "new line" is typed. Shift+Enter is safe in chat boxes (Enter would send the message).
+LINE_BREAK_KEYS = ("shift_enter", "enter")
+
 # How often Moonshine refreshes the live transcript. Longer = noticeably less CPU while
 # speaking, at the cost of sentences being typed a fraction of a second later.
 RESPONSIVENESS_SECONDS = {"efficient": 1.0, "fast": 0.5}
@@ -39,6 +42,8 @@ DEFAULT_CONFIG = {
     "continuous_mode": True,
     "filter_filler_words": True,
     "enable_emojis": True,
+    "voice_formatting": True,
+    "line_break_key": "shift_enter",
     "safety_idle_timeout_seconds": 180.0,
     "auto_stop_on_pause": False,
     "pause_duration_seconds": 2.0,
@@ -100,7 +105,7 @@ def normalize(config: dict) -> dict:
         value = config.get(key, d[key])
         out[key] = value if (value is None or isinstance(value, str)) else d[key]
 
-    for key in ("continuous_mode", "filter_filler_words", "enable_emojis",
+    for key in ("continuous_mode", "filter_filler_words", "enable_emojis", "voice_formatting",
                 "auto_stop_on_pause", "esc_to_finish", "clipboard_safety_net"):
         out[key] = _as_bool(config.get(key, d[key]), d[key])
 
@@ -114,6 +119,9 @@ def normalize(config: dict) -> dict:
 
     resp = config.get("responsiveness", d["responsiveness"])
     out["responsiveness"] = resp if resp in RESPONSIVENESS_SECONDS else d["responsiveness"]
+
+    key = config.get("line_break_key", d["line_break_key"])
+    out["line_break_key"] = key if key in LINE_BREAK_KEYS else d["line_break_key"]
 
     mic = config.get("microphone")
     out["microphone"] = mic.strip() if isinstance(mic, str) and mic.strip() else None

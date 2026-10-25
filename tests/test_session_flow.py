@@ -252,6 +252,89 @@ class SessionFlowTests(unittest.TestCase):
         self.assertTrue(any("Settings" in t for t in texts))
         self.assertFalse(any("Settings File" in t for t in texts))
 
+    # line breaks and lists ---------------------------------------------------
+    def test_numbered_list_session(self):
+        self.start()
+        self.say("Shopping list.")
+        self.say("Numbered list.")
+        self.say("Buy milk.")
+        self.say("Next item.")
+        self.say("Buy eggs.")
+        self.say("End list.")
+        self.say("Thanks.")
+        self.assertEqual(self.injections, ["Shopping list.", "\n1. Buy milk.", "\n2. Buy eggs.", "\nThanks."])
+
+    def test_list_item_continues_across_pauses_until_next_item(self):
+        self.start()
+        self.say("Bullet list.")
+        self.say("Call Sam")
+        self.say("about the contract.")
+        self.say("Next item.")
+        self.say("Book flights.")
+        self.assertEqual(self.injections, ["- Call Sam", " About the contract.", "\n- Book flights."])
+
+    def test_new_line_and_new_paragraph(self):
+        self.start()
+        self.say("Hello.")
+        self.say("New line.")
+        self.say("World.")
+        self.say("New paragraph.")
+        self.say("Bye.")
+        self.assertEqual(self.injections, ["Hello.", "\n", "World.", "\n\n", "Bye."])
+
+    def test_scratch_that_takes_back_a_list_item_and_its_number(self):
+        self.start()
+        self.say("Numbered list.")
+        self.say("Milk.")
+        self.say("Next item.")
+        self.say("Eggz.")
+        self.say("Scratch that.")
+        self.say("Eggs.")
+        self.assertEqual(self.injections, ["1. Milk.", "\n2. Eggz.", "\n2. Eggs."])
+        self.assertEqual(self.deletions, [len("\n2. Eggz.")])
+
+    def test_delete_last_word_keeps_line_breaks(self):
+        self.start()
+        self.say("Hello there.")
+        self.say("New line.")
+        self.say("General Kenobi.")
+        self.say("Delete last word.")
+        self.assertEqual(self.deletions, [len("Kenobi.") + 1])     # the word and the space before it
+        self.assertEqual(self.ctrl._session_injected_text, "Hello there.\nGeneral")
+
+    def test_delete_all_resets_the_list_counter(self):
+        self.start()
+        self.say("Numbered list.")
+        self.say("One.")
+        self.say("Next item.")
+        self.say("Two.")
+        self.say("Delete all.")
+        self.say("Fresh.")
+        self.assertEqual(self.injections[-1], "1. Fresh.")
+
+    def test_next_item_without_a_list_does_nothing(self):
+        self.start()
+        self.say("Hello.")
+        self.say("Next item.")
+        self.say("World.")
+        self.assertEqual(self.injections, ["Hello.", " World."])
+        self.assertIn("notify_status", self.pill.names())
+
+    def test_layout_commands_are_typed_literally_when_turned_off(self):
+        self.ctrl.apply_settings(dict(self.ctrl._config, voice_formatting=False))
+        self.start()
+        self.say("New line.")
+        self.assertEqual(self.injections, ["New line."])
+
+    def test_list_state_does_not_leak_into_the_next_session(self):
+        self.start()
+        self.say("Numbered list.")
+        self.say("One.")
+        self.stop("Numbered list. One.")
+        self.start()
+        self.say("Plain.")
+        self.assertEqual(self.injections[-1], "Plain.")
+
     # idle memory ------------------------------------------------------------
     def test_memory_trim_is_scheduled_after_a_session_and_skipped_while_recording(self):
         self.start()
@@ -279,7 +362,7 @@ class SessionFlowTests(unittest.TestCase):
         self.assertFalse(self.ctrl._continuous_mode)
         self.assertFalse(self.ctrl._enable_emojis)
         self.assertEqual(self.ctrl._safety_idle_timeout, 600.0)
-        self.assertEqual(self.injector_config[-1], {"clipboard_safety_net": True})
+        self.assertEqual(self.injector_config[-1], {"clipboard_safety_net": True, "line_break_key": "shift_enter"})
 
     def test_apply_settings_reconfigures_hotkeys_only_when_they_changed(self):
         self.ctrl.apply_settings(self._config(enable_emojis=False))

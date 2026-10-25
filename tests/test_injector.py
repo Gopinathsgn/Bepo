@@ -57,3 +57,52 @@ class InjectorClipboardTests(unittest.TestCase):
         self.clip.copy.assert_not_called()
 
 
+class InjectorLineBreakTests(unittest.TestCase):
+    def setUp(self):
+        self.addCleanup(injector.configure)
+        self.calls = []
+        patches = [
+            mock.patch.object(injector, "_send_unicode_string", lambda t: self.calls.append(("text", t)) or True),
+            mock.patch.object(injector, "_send_line_break", lambda: self.calls.append(("break",)) or True),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_newlines_become_line_break_keystrokes(self):
+        self.assertTrue(injector._send_text("a\nb\n\nc"))
+        self.assertEqual(self.calls, [("text", "a"), ("break",), ("text", "b"), ("break",), ("break",), ("text", "c")])
+
+    def test_text_without_newlines_is_sent_in_one_piece(self):
+        injector._send_text("hello world")
+        self.assertEqual(self.calls, [("text", "hello world")])
+
+    def test_windows_line_endings_count_once(self):
+        injector._send_text("a\r\nb")
+        self.assertEqual(self.calls, [("text", "a"), ("break",), ("text", "b")])
+
+
+class InjectorLineBreakKeyTests(unittest.TestCase):
+    def setUp(self):
+        self.addCleanup(injector.configure)
+        fake_windll = mock.MagicMock()
+        fake_windll.user32.SendInput.side_effect = lambda n, arr, size: n
+        p = mock.patch.object(injector.ctypes, "windll", fake_windll, create=True)
+        p.start()
+        self.addCleanup(p.stop)
+        self.windll = fake_windll
+
+    def keys_sent(self):
+        arr = self.windll.user32.SendInput.call_args.args[1]
+        return [(i.union.ki.wVk, bool(i.union.ki.dwFlags & injector.KEYEVENTF_KEYUP)) for i in arr]
+
+    def test_shift_enter_is_the_default(self):
+        injector.configure()
+        self.assertTrue(injector._send_line_break())
+        self.assertEqual(self.keys_sent(), [(injector.VK_SHIFT, False), (injector.VK_RETURN, False),
+                                            (injector.VK_RETURN, True), (injector.VK_SHIFT, True)])
+
+    def test_plain_enter_when_configured(self):
+        injector.configure(line_break_key="enter")
+        self.assertTrue(injector._send_line_break())
+        self.assertEqual(self.keys_sent(), [(injector.VK_RETURN, False), (injector.VK_RETURN, True)])
