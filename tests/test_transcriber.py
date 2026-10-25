@@ -180,6 +180,26 @@ class FlushAndSessionTests(unittest.TestCase):
         self.assertIsNone(h.t._session)
         self.assertFalse(h.models[0].closed)             # the model is kept for the next dictation
 
+    def test_mid_session_error_releases_the_microphone(self):
+        h = Harness(self)
+        h.wait_ready()
+        h.t.start_recording()
+        session = h.sessions[0]
+        session.on_error(OSError("device unplugged"))
+        self.assertTrue(wait_for(lambda: session.closed))
+        self.assertEqual(h.errors, ["device unplugged"])
+        self.assertIsNone(h.t._session)
+        self.assertFalse(h.t._recording)
+
+    def test_starting_again_closes_a_leftover_session(self):
+        h = Harness(self)
+        h.wait_ready()
+        h.t.start_recording()
+        h.t.start_recording()
+        self.assertEqual(len(h.sessions), 2)
+        self.assertTrue(h.sessions[0].closed)
+        self.assertFalse(h.sessions[1].closed)
+
     def test_microphone_is_released_when_it_fails_to_open(self):
         h = Harness(self, fail_start=True)
         h.wait_ready()

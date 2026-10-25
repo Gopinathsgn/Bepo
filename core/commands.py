@@ -41,7 +41,7 @@ _DELETE_WORD_STANDALONE = re.compile(
 )
 
 _DELETE_N_WORDS_STANDALONE = re.compile(
-    r"^(?:please\s+)?(?:delete|erase|scratch)\s+(?:the\s+)?last\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+words?[.!]?$",
+    r"^(?:please\s+)?(?:delete|erase|scratch)\s+(?:the\s+)?last\s+([1-9]\d*|one|two|three|four|five|six|seven|eight|nine|ten)\s+words?[.!]?$",
     re.IGNORECASE,
 )
 

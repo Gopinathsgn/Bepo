@@ -21,6 +21,8 @@ class VoiceCommandTests(unittest.TestCase):
     def test_delete_n_words(self):
         cmd, count, _ = parse_voice_command("Delete last three words")
         self.assertEqual((cmd, count), (CommandType.DELETE_WORDS, 3))
+        # "0 words" must never be a command (it used to wipe everything)
+        self.assertEqual(parse_voice_command("Delete last 0 words")[0], CommandType.NONE)
         cmd, count, _ = parse_voice_command("delete last 12 words.")
         self.assertEqual((cmd, count), (CommandType.DELETE_WORDS, 12))
 

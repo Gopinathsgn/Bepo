@@ -15,6 +15,7 @@ class InjectorClipboardTests(unittest.TestCase):
         injector.configure(clipboard_safety_net=False)
         fake_windll = mock.MagicMock()
         fake_windll.user32.GetAsyncKeyState.return_value = 0
+        fake_windll.user32.SendInput.side_effect = lambda n, arr, size: n
         patches = [
             mock.patch.object(injector.ctypes, "windll", fake_windll, create=True),
             mock.patch.object(injector.time, "sleep"),
@@ -45,12 +46,33 @@ class InjectorClipboardTests(unittest.TestCase):
 
     def test_paste_fallback_restores_previous_clipboard(self):
         self.clip.paste.return_value = "my precious clipboard"
-        with mock.patch.object(injector, "_send_unicode_string", return_value=False):
+        with mock.patch.object(injector, "_send_unicode_string", return_value=False),                 mock.patch.object(injector, "_clipboard_is_text_only", return_value=True):
             self.assertTrue(injector.inject_text("dictated text"))
         copies = [c.args[0] for c in self.clip.copy.call_args_list]
         self.assertEqual(copies, ["dictated text", "my precious clipboard"])
-        # Ctrl+V was simulated
-        self.assertTrue(self.windll.user32.keybd_event.called)
+        # Ctrl+V was simulated (down/up for Ctrl and V)
+        self.assertEqual(self.windll.user32.SendInput.call_args.args[0], 4)
+
+    def test_paste_fallback_leaves_non_text_clipboard_alone(self):
+        with mock.patch.object(injector, "_send_unicode_string", return_value=False),                 mock.patch.object(injector, "_clipboard_is_text_only", return_value=False):
+            self.assertFalse(injector.inject_text("dictated text"))
+        self.clip.copy.assert_not_called()
+
+    def test_paste_fallback_reports_failure_when_keystroke_rejected(self):
+        self.windll.user32.SendInput.side_effect = lambda n, arr, size: 0
+        with mock.patch.object(injector, "_send_unicode_string", return_value=False),                 mock.patch.object(injector, "_clipboard_is_text_only", return_value=True):
+            self.assertFalse(injector.inject_text("dictated text"))
+
+    def test_clipboard_format_probe(self):
+        user32 = self.windll.user32
+        user32.OpenClipboard.return_value = 1
+        user32.EnumClipboardFormats.side_effect = [13, 16, 0]
+        self.assertTrue(injector._clipboard_is_text_only())
+        user32.EnumClipboardFormats.side_effect = [13, 2, 0]      # CF_BITMAP
+        self.assertFalse(injector._clipboard_is_text_only())
+        user32.EnumClipboardFormats.side_effect = [0]             # empty clipboard
+        self.assertTrue(injector._clipboard_is_text_only())
+        self.assertEqual(user32.CloseClipboard.call_count, 3)
 
     def test_empty_text_is_a_noop(self):
         self.assertTrue(injector.inject_text(""))

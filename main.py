@@ -465,7 +465,7 @@ class BepoApp(QObject):
                 current = self._session_injected_text.rstrip()
                 words = list(re.finditer(r"\S+", current))
                 if words:
-                    num_to_drop = min(count, len(words))
+                    num_to_drop = max(1, min(count, len(words)))
                     # Cut at the start of the first dropped word; keep any line breaks before it
                     kept = current[:words[-num_to_drop].start()].rstrip(" \t")
                     chars_to_delete = len(self._session_injected_text) - len(kept)

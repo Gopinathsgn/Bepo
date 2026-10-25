@@ -155,6 +155,8 @@ class TranscriberThread(QObject):
             self.error.emit("Still finishing the previous dictation, try again in a moment...")
             return
 
+        self._release_session()      # never leave a previous session's microphone open
+
         with self._lock:
             self._recording = True
             self._completed_lines.clear()
@@ -183,10 +185,14 @@ class TranscriberThread(QObject):
         """Close the dictation session, which releases the microphone (the model stays loaded)."""
         session, self._session = self._session, None
         if session is not None:
-            try:
-                session.close()
-            except Exception as exc:
-                logging.warning("[Transcriber] Error closing microphone: %s", exc)
+            self._close_session(session)
+
+    @staticmethod
+    def _close_session(session):
+        try:
+            session.close()
+        except Exception as exc:
+            logging.warning("[Transcriber] Error closing microphone: %s", exc)
 
     def _async_stop(self):
         try:
@@ -278,4 +284,13 @@ class TranscriberThread(QObject):
             self.segment_text.emit(text)
 
     def _on_error(self, exc: BaseException):
+        # The session is broken (e.g. microphone unplugged): end it and release the microphone.
+        # Closing happens on its own thread because this callback runs on the session's thread.
+        if self._recording and not self._stopping:
+            self._recording = False
+            session, self._session = self._session, None
+            if session is not None:
+                threading.Thread(
+                    target=self._close_session, args=(session,), daemon=True, name="TranscriberAbort"
+                ).start()
         self.error.emit(str(exc))

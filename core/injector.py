@@ -176,28 +176,76 @@ def _release_held_keys() -> None:
     user32.SendInput(len(inputs), arr, ctypes.sizeof(INPUT))
 
 
+# Clipboard formats that pyperclip can save and restore faithfully (plain text only).
+_TEXT_CLIPBOARD_FORMATS = {
+    1,    # CF_TEXT
+    7,    # CF_OEMTEXT
+    13,   # CF_UNICODETEXT
+    16,   # CF_LOCALE (accompanies text)
+}
+
+
+def _clipboard_is_text_only() -> bool:
+    """
+    True if the clipboard is empty or holds only plain text, i.e. a copy/paste/restore round trip
+    cannot lose anything. Images, files and rich formats cannot be restored through pyperclip.
+    """
+    user32 = ctypes.windll.user32
+    for _ in range(10):
+        if user32.OpenClipboard(None):
+            break
+        time.sleep(0.01)
+    else:
+        return False
+    try:
+        fmt = user32.EnumClipboardFormats(0)
+        while fmt:
+            if fmt not in _TEXT_CLIPBOARD_FORMATS:
+                return False
+            fmt = user32.EnumClipboardFormats(fmt)
+        return True
+    finally:
+        user32.CloseClipboard()
+
+
+def _send_paste_shortcut() -> bool:
+    """Press Ctrl+V via SendInput. True only if Windows accepted every key event."""
+    user32 = ctypes.windll.user32
+    keys = [(VK_CONTROL, 0), (VK_V, 0), (VK_V, KEYEVENTF_KEYUP), (VK_CONTROL, KEYEVENTF_KEYUP)]
+    inputs = [
+        INPUT(type=INPUT_KEYBOARD, union=_INPUTunion(
+            ki=KEYBDINPUT(wVk=vk, wScan=0, dwFlags=flags, time=0, dwExtraInfo=0)))
+        for vk, flags in keys
+    ]
+    arr = (INPUT * len(inputs))(*inputs)
+    return user32.SendInput(len(inputs), arr, ctypes.sizeof(INPUT)) == len(inputs)
+
+
 def _clipboard_inject(text: str, restore_text: str | None) -> bool:
     """
     Fallback: copy text to the clipboard and simulate Ctrl+V.
     Afterwards the clipboard is put back: to `restore_text` if given (safety-net mode),
-    otherwise to whatever text the user had on it before (text formats only).
+    otherwise to whatever text the user had on it before.
+
+    If the user's clipboard holds something that is not plain text (an image, files, rich
+    content) it could not be restored, so the fallback is skipped rather than destroying it.
+    Returns False when the paste keystroke was not accepted by Windows.
     """
-    user32 = ctypes.windll.user32
     previous = None
     if restore_text is None:
+        if not _clipboard_is_text_only():
+            logging.warning("[Injector] Paste fallback skipped: the clipboard holds non-text data")
+            return False
         try:
             previous = pyperclip.paste()
         except Exception:
             previous = None
 
+    pasted = False
     try:
         pyperclip.copy(text)
         time.sleep(0.03)
-
-        user32.keybd_event(VK_CONTROL, 0, 0, 0)
-        user32.keybd_event(VK_V, 0, 0, 0)
-        user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
-        user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+        pasted = _send_paste_shortcut()
         # Give the target app time to read the clipboard before we restore it
         time.sleep(0.15)
     except Exception as exc:
@@ -211,7 +259,9 @@ def _clipboard_inject(text: str, restore_text: str | None) -> bool:
                 pyperclip.copy(previous)
         except Exception:
             pass
-    return True
+    if not pasted:
+        logging.warning("[Injector] Paste keystroke was not accepted by Windows")
+    return pasted
 
 
 def inject_text(text: str, full_session_text: str | None = None) -> bool:
