@@ -1,7 +1,7 @@
 """
 about_dialog.py
 Credits and About screen for Bepo.
-Displays author attribution (Gopinath), GitHub link, and GPLv3 license notices.
+Shows a discreet author credit, GitHub link, and the GPLv3 / third-party license notices.
 """
 
 import os
@@ -10,8 +10,8 @@ import ctypes
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 )
-from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QFont, QPixmap, QIcon, QDesktopServices
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QPixmap, QIcon
 
 from version import __version__
 
@@ -40,7 +40,7 @@ class AboutDialog(QDialog):
             Qt.WindowType.Dialog |
             Qt.WindowType.WindowCloseButtonHint
         )
-        self.setFixedSize(440, 360)
+        self.setFixedSize(440, 330)
         self.setStyleSheet("""
             QDialog {
                 background: #1C1C1E;
@@ -93,27 +93,15 @@ class AboutDialog(QDialog):
         divider.setStyleSheet("background: rgba(255, 255, 255, 0.1);")
         layout.addWidget(divider)
 
-        # Author Credits
-        credits_card = QVBoxLayout()
-        credits_card.setSpacing(6)
-
-        author_heading = QLabel("Created & Developed by")
-        author_heading.setFont(QFont(UI_FONT, 10, QFont.Weight.Medium))
-        author_heading.setStyleSheet("color: rgba(255, 255, 255, 0.55); background: transparent;")
-        credits_card.addWidget(author_heading)
-
-        author_name = QLabel("Gopinath")
-        author_name.setFont(QFont(UI_FONT, 16, QFont.Weight.Bold))
-        author_name.setStyleSheet("color: #38BDF8; background: transparent;")  # Sky blue accent
-        credits_card.addWidget(author_name)
-
-        github_link = QLabel('<a href="https://github.com/Gopinathsgn" style="color: #60A5FA; text-decoration: none;">github.com/Gopinathsgn</a>')
-        github_link.setFont(QFont(UI_FONT, 11))
-        github_link.setOpenExternalLinks(True)
-        github_link.setStyleSheet("background: transparent;")
-        credits_card.addWidget(github_link)
-
-        layout.addLayout(credits_card)
+        # Attribution: one quiet line
+        author_line = QLabel(
+            'Made by Gopinath · '
+            '<a href="https://github.com/Gopinathsgn" style="color: rgba(255, 255, 255, 0.6);">GitHub</a>'
+        )
+        author_line.setFont(QFont(UI_FONT, 10))
+        author_line.setOpenExternalLinks(True)
+        author_line.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
+        layout.addWidget(author_line)
 
         # License notice
         license_box = QLabel(
@@ -138,23 +126,6 @@ class AboutDialog(QDialog):
         # Action Buttons
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
-
-        github_btn = QPushButton("Open GitHub Profile")
-        github_btn.setFont(QFont(UI_FONT, 10, QFont.Weight.Medium))
-        github_btn.setStyleSheet("""
-            QPushButton {
-                background: rgba(255, 255, 255, 0.1);
-                color: #FFFFFF;
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 6px;
-                padding: 6px 14px;
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.18);
-            }
-        """)
-        github_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/Gopinathsgn")))
-        btn_row.addWidget(github_btn)
 
         btn_row.addStretch()
 

@@ -31,7 +31,6 @@ from core.commands import CommandType, parse_voice_command
 from core.hotkey import HotkeyManager, DEFAULT_TOGGLE, DEFAULT_PTT
 from ui.pill import PillWindow
 from ui.setup_screen import SetupScreen
-from ui.about_dialog import AboutDialog
 from ui.settings_dialog import SettingsDialog
 
 # Seconds of idleness before Bepo hands its idle memory back to Windows
@@ -157,7 +156,6 @@ class BepoApp(QObject):
         self._last_partial: str = ""
         self._has_spoken: bool = False
         self._settings_dialog = None
-        self._about_dialog = None
 
         # Configurable features (re-read by _apply_runtime_settings whenever settings change)
         self._apply_runtime_settings()
@@ -628,13 +626,9 @@ class BepoApp(QObject):
         self._dictate_action.triggered.connect(self._toggle_recording)
         menu.addAction(self._dictate_action)
 
-        settings_action = QAction("⚙️  Settings…", self._app)
+        settings_action = QAction("⚙️  Settings", self._app)
         settings_action.triggered.connect(self._show_settings)
         menu.addAction(settings_action)
-
-        about_action = QAction("ℹ️  About Bepo", self._app)
-        about_action.triggered.connect(self._show_about)
-        menu.addAction(about_action)
 
         menu.addSeparator()
 
@@ -644,13 +638,6 @@ class BepoApp(QObject):
 
         tray.setContextMenu(menu)
         return tray
-
-    def _show_about(self):
-        if self._about_dialog is None:
-            self._about_dialog = AboutDialog()
-        self._about_dialog.show()
-        self._about_dialog.raise_()
-        self._about_dialog.activateWindow()
 
     def cleanup(self):
         self._silence_timer.stop()

@@ -287,7 +287,7 @@ bepo/
 
 ## ⚙️ Settings
 
-Right-click the Bepo tray icon → **Settings…**. Everything applies the moment you press **Save** — no restart.
+Right-click the Bepo tray icon → **Settings**. Everything applies the moment you press **Save** — no restart.
 
 | Section | What you can change |
 |---|---|

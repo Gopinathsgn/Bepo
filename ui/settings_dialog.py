@@ -24,6 +24,7 @@ from core import audio_devices
 from core import config as app_config
 from core.hotkey import parse_hotkey
 from setup.model_downloader import MODELS, is_model_downloaded
+from ui.about_dialog import AboutDialog
 from ui.setup_screen import DownloadThread, breakable
 
 IS_WINDOWS_11 = sys.platform == "win32" and hasattr(sys, "getwindowsversion") and sys.getwindowsversion().build >= 22000
@@ -230,6 +231,7 @@ class SettingsDialog(QDialog):
         self._suspend, self._resume = suspend_hotkeys, resume_hotkeys
         self._download = None
         self._pending: dict | None = None
+        self._about = None
 
         self.setWindowTitle("Bepo Settings")
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowCloseButtonHint)
@@ -404,6 +406,10 @@ class SettingsDialog(QDialog):
         self.defaults_btn.setObjectName("link")
         self.defaults_btn.clicked.connect(self._restore_defaults)
         buttons.addWidget(self.defaults_btn)
+        self.about_btn = QPushButton("About")
+        self.about_btn.setObjectName("link")
+        self.about_btn.clicked.connect(self._show_about)
+        buttons.addWidget(self.about_btn)
         buttons.addStretch(1)
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.clicked.connect(self.reject)
@@ -420,6 +426,13 @@ class SettingsDialog(QDialog):
         self.continuous_check.toggled.connect(self._update_enabled)
         self.autostop_check.toggled.connect(self._update_enabled)
         self.model_combo.currentIndexChanged.connect(self._update_model_hint)
+
+    def _show_about(self):
+        if self._about is None:
+            self._about = AboutDialog(self)
+        self._about.show()
+        self._about.raise_()
+        self._about.activateWindow()
 
     # ------------------------------------------------------------------ #
     # Loading values into the widgets                                     #
