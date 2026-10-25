@@ -8,7 +8,7 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
@@ -59,10 +59,20 @@ class DialogTestCase(unittest.TestCase):
             cfg or config.normalize({}), launch_at_startup=startup,
             suspend_hotkeys=self._suspend, resume_hotkeys=self._resume,
         )
-        self.addCleanup(dialog.close)
+        self.addCleanup(self._dispose, dialog)
         self.saved = []
         dialog.saved.connect(lambda c, s: self.saved.append((c, s)))
         return dialog
+
+    @staticmethod
+    def _dispose(dialog):
+        # Destroy the dialog while Qt is still alive. Left to the garbage collector, widgets are torn
+        # down in arbitrary order at interpreter exit, which crashed the process (exit code 0xC0000409
+        # / 0xC0000005) after all tests had passed and failed CI.
+        dialog.close()
+        dialog.deleteLater()
+        QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        _app.processEvents()
 
     def _suspend(self):
         self.suspended += 1
