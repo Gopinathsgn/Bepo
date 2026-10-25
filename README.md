@@ -435,7 +435,7 @@ ISCC.exe installer.iss
 
 This outputs `dist\Bepo-Setup-v<version>.exe` (the version comes from [`version.py`](version.py) in CI; pass `/DMyAppVersion=x.y.z` to override it locally) ready for distribution.
 
-Releases are built automatically by GitHub Actions when you push a tag such as `v1.0.0` (the tag must match `version.py`).
+Releases are built automatically by GitHub Actions when you push a tag such as `v1.1.0` (the tag must match `version.py`).
 
 ---
 
