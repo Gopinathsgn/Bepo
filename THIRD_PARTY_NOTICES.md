@@ -2,8 +2,8 @@
 
 Bepo is licensed under the GPLv3 (see [LICENSE](LICENSE)). It uses and, in release builds, redistributes the
 components below, each under its own license. This file is a summary, not a substitute for the licenses
-themselves; the full license text of every Python package shipped in a release build is included in the
-`*.dist-info` folders inside the application directory.
+themselves; the license text of most Python packages shipped in a release build is included in the
+`*.dist-info` folders inside the application directory (Qt's is provided in `licenses/`, see below).
 
 ## Moonshine AI — speech recognition engine and model
 
@@ -42,10 +42,23 @@ SOFTWARE.
 
 ## Qt for Python (PySide6) / Qt
 
-- **License:** LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only (Bepo uses it under the LGPLv3/GPLv3 terms)
+- **License:** LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only OR commercial. Bepo uses it under the **LGPLv3**
+  (and, as Bepo itself is GPLv3, the GPLv3 terms are also satisfied).
 - **Copyright:** The Qt Company Ltd. and contributors
-- Release builds ship the unmodified PySide6 and Qt libraries as separate DLLs next to `Bepo.exe`, so they can be
-  replaced by the user. Source code: <https://code.qt.io/> and <https://pypi.org/project/PySide6/>.
+- **Used modules:** QtCore, QtGui, QtWidgets and QtSvg only. Release builds do not include WebEngine, Qt Charts,
+  Data Visualization, Quick 3D or Virtual Keyboard.
+- **License texts:** [licenses/LGPL-3.0.txt](licenses/LGPL-3.0.txt) and [licenses/GPL-3.0.txt](licenses/GPL-3.0.txt)
+  (also shipped in the `licenses` folder of every release). The PySide6 wheel itself only carries the commercial
+  license text in its `dist-info`, which is why these are provided separately.
+- **Unmodified:** Bepo ships the stock PySide6/Qt binaries from PyPI (the version pinned by the release, see
+  `PySide6-*.dist-info` in the application folder), without changes.
+- **Replacing Qt:** the Qt and PySide6 libraries are separate DLL/PYD files in the `_internal\PySide6` folder next to
+  `Bepo.exe` (a one-folder build, not a single self-extracting file). You may replace them with your own build of
+  a compatible Qt/PySide6 version, and Bepo's own source (GPLv3) is available to relink or rebuild.
+- **Source code:** the corresponding source of the exact version is at <https://code.qt.io/cgit/pyside/pyside-setup.git/>
+  and <https://download.qt.io/official_releases/QtForPython/>; Bepo's source is at
+  <https://github.com/Gopinathsgn>. If you cannot get it there, open an issue on the Bepo repository and
+  the source will be provided on request, for at least three years after the release.
 
 ## Other Python packages
 
@@ -55,7 +68,8 @@ SOFTWARE.
 | numpy | Audio buffers (via moonshine-voice) | BSD-3-Clause |
 | sounddevice / PortAudio | Microphone capture (via moonshine-voice) | MIT |
 | requests, tqdm, filelock, platformdirs, google-crc32c | Model download (via moonshine-voice) | see each package's license |
-| PyInstaller | Builds the executable (build time only) | GPL-2.0 with bootloader exception |
+| Python (CPython runtime, bundled) | Interpreter | PSF License |
+| PyInstaller | Builds the executable (build time only); its bootloader is bundled | GPL-2.0 with bootloader exception |
 
 ## Build tooling
 

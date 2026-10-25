@@ -118,7 +118,8 @@ class AboutDialog(QDialog):
         # License notice
         license_box = QLabel(
             "Copyright \u00a9 2026 Gopinath. Licensed under the GNU General Public License v3.0 (GPLv3).\n"
-            "Speech recognition by Moonshine AI (MIT). Please keep the original copyright "
+            "Speech recognition by Moonshine AI (MIT). Interface built with Qt for Python "
+            "(PySide6), used under the LGPLv3; see THIRD_PARTY_NOTICES.md. Please keep the original copyright "
             "and license notices when redistributing or modifying Bepo."
         )
         license_box.setFont(QFont(UI_FONT, 9))

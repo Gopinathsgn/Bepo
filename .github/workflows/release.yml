@@ -58,6 +58,12 @@ jobs:
             main.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # GPLv3/LGPLv3 compliance: the license texts and notices must travel with the binaries.
+      - name: Add license files to the package
+        run: |
+          Copy-Item LICENSE, NOTICE, THIRD_PARTY_NOTICES.md -Destination dist\Bepo
+          Copy-Item licenses -Destination dist\Bepo\licenses -Recurse
+
       # Downloads the model if needed, copies it into dist\Bepo\models and FAILS the build
       # if a complete model can't be bundled (so we never ship a model-less "offline" build).
       - name: Download & bundle Moonshine AI model

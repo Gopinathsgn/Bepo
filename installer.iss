@@ -26,6 +26,7 @@ SetupIconFile=assets\icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+LicenseFile=LICENSE
 PrivilegesRequired=lowest
 
 [Languages]

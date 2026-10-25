@@ -49,6 +49,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:: Ship the license texts and notices with the binaries (GPLv3 / LGPLv3 requirement)
+copy /y "LICENSE" "dist\Bepo\" >nul
+copy /y "NOTICE" "dist\Bepo\" >nul
+copy /y "THIRD_PARTY_NOTICES.md" "dist\Bepo\" >nul
+xcopy /e /i /y "licenses" "dist\Bepo\licenses" >nul
+
 :: 5. Bundle Moonshine model into dist\Bepo\models
 echo [4/5] Bundling Moonshine AI model into application folder...
 python -m setup.model_downloader dist/Bepo/models

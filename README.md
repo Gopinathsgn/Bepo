@@ -411,7 +411,8 @@ Copyright © 2026 **Gopinath** ([@Gopinathsgn](https://github.com/Gopinathsgn)) 
 Distributed under the **GNU General Public License v3.0 (GPLv3)**. See [`LICENSE`](LICENSE) for details.
 
 > 💼 **Commercial & Enterprise Licensing:**  
-> For businesses, OEMs, or proprietary products requiring a commercial license or custom integrations without GPLv3 copyleft terms, feel free to reach out at **[sgn@outlook.in](mailto:sgn@outlook.in)**.
+> For businesses, OEMs, or proprietary products requiring a commercial license or custom integrations without GPLv3 copyleft terms, feel free to reach out at **[sgn@outlook.in](mailto:sgn@outlook.in)**.  
+> Commercial licenses cover Bepo's own code only. Third-party components keep their own licenses; in particular, Qt is used under the LGPLv3 and must remain bundled as separate, replaceable libraries.
 
 Bepo bundles third-party components (Moonshine AI speech engine and model, Qt for Python, and others) under their own licenses — see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
