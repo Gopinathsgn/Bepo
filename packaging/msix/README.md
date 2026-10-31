@@ -30,7 +30,7 @@ who want to install outside the Store use the `Bepo-Setup` installer.
 
 ```powershell
 .\build.bat                                   # produces dist\Bepo
-.\packaging\msix\build_msix.ps1 -Version 1.2.1 `
+.\packaging\msix\build_msix.ps1 -Version 1.2.2 `
     -IdentityName <Name> -Publisher "<CN=...>" -PublisherDisplayName <Name>
 ```
 

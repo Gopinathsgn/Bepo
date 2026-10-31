@@ -3,7 +3,7 @@
 
 #define MyAppName "Bepo"
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.0"   ; overridden by CI: ISCC /DMyAppVersion=x.y.z
+  #define MyAppVersion "1.2.2"   ; overridden by CI: ISCC /DMyAppVersion=x.y.z
 #endif
 #define MyAppPublisher "Gopinath"
 #define MyAppURL "https://github.com/Gopinathsgn"

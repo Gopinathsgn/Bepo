@@ -1,3 +1,3 @@
 """Single source of truth for the Bepo version (used by the About dialog and release checks)."""
 
-__version__ = "1.2.0"
+__version__ = "1.2.2"

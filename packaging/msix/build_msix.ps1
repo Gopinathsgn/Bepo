@@ -12,7 +12,7 @@
   MSIX_PUBLISHER_DISPLAY_NAME (the release workflow reads them from repository variables).
 
 .EXAMPLE
-  .\packaging\msix\build_msix.ps1 -Version 1.2.1 -IdentityName 12345Gopinath.Bepo -Publisher "CN=ABCD1234-..." -PublisherDisplayName Gopinath
+  .\packaging\msix\build_msix.ps1 -Version 1.2.2 -IdentityName 12345Gopinath.Bepo -Publisher "CN=ABCD1234-..." -PublisherDisplayName Gopinath
 #>
 param(
     [Parameter(Mandatory = $true)] [string] $Version,                  # x.y.z (version.py)
