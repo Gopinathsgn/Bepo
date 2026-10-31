@@ -71,6 +71,8 @@ Unlike traditional cloud voice assistants, Bepo runs **Moonshine AI's quantized 
 | ⚡ **Sub-Second Streaming** | Powered by Moonshine's streaming speech models (Tiny, Small or Medium — your choice) with real-time word output. |
 | 🔄 **Continuous Dictation** | Streams and types sentence-by-sentence live into your active app without cutting off when you pause to think. |
 | ⌫ **Voice Deletion Commands** | Speak commands like *"Scratch that"*, *"Delete last word"*, or *"Clear all"* to instantly erase typed words. |
+| ↶ **Undo Shortcut** | Press `Alt + Win + Z` to delete everything your last dictation typed — handy after you have already stopped. |
+| 👋 **First-Run Welcome** | The first time Bepo starts, the pill pops up once and shows how to start and stop dictating. |
 | 🎙️ **Dual Input Modes** | **Toggle Mode** (`Ctrl + Win`) for hands-free streaming and **Push-to-Talk** (`Ctrl + Space`) for quick replies. |
 | 🧹 **Filler Word Filter** | Automatically scrubs vocal hesitations (`um`, `uh`, `erm`, `er`, `ah`, `hmm`) for clean, professional transcripts. |
 | 🔢 **Smart Formatting** | *"comma"*, *"question mark"*, *"open quote"* become punctuation; *"twenty five"* → 25, *"fifty percent"* → 50%, *"jane at gmail dot com"* → jane@gmail.com. Small numbers (one–ten) stay words. Turn it off in Settings. |
@@ -140,7 +142,7 @@ Because Bepo is a background tool for ordinary laptops. It has to sit in your tr
 1. Download the latest `Bepo-Setup-v<version>.exe` from the [Releases](../../releases) tab.
 2. Run the installer (installs into `%LOCALAPPDATA%`, **no Admin rights required**).
 3. Launch Bepo from the Start Menu or Desktop shortcut.
-4. Press `Ctrl + Space` or `Ctrl + Win` to begin dictating!
+4. Bepo greets you with the pill on first launch, showing how to start and stop. Press `Ctrl + Win` (or hold `Ctrl + Space`) to begin dictating!
 
 > 🛡️ **Windows SmartScreen:** the installer is not code-signed yet, so Windows may show *"Windows protected your PC"*. Click **More info → Run anyway**. If you'd rather not trust a binary, [run from source](#option-b-run-from-source) — the whole app is plain, readable Python (about 4,000 lines).
 
@@ -190,8 +192,14 @@ python main.py
 - **Shortcut:** `Esc` (while recording)
 - **Behavior:** Flushes any trailing speech buffer, types the text, and closes the overlay.
 
+### ↶ 4. Undo Last Dictation
+- **Shortcut:** `Alt + Win + Z`
+- **Behavior:** Deletes all the text your most recent dictation typed, then plays the delete sound. Press it once per dictation.
+- **Safe by design:** it only works while you are *not* recording and only if you are still in the window you dictated into. Otherwise Bepo tells you in a tray notification instead of deleting anything.
+- **Why not `Ctrl + Win + Z`?** `Ctrl + Win` is the start/stop shortcut and fires the moment both keys go down, so it would start a new dictation before you reached `Z`.
+
 ### ⚠️ Shortcut conflicts
-Global shortcuts are registered system-wide, so while Bepo runs, **`Ctrl + Space` is no longer delivered to other apps** — it is the autocomplete trigger in VS Code, Visual Studio and JetBrains IDEs, and the IME switch on some keyboards. If that bothers you, open **tray → Settings…** and record a different push-to-talk shortcut (e.g. `Ctrl+Alt+Space` or `F9`) or disable it — see [Settings](#-settings). If a shortcut can't be registered because another app owns it, Bepo shows a tray notification and the tray menu still works.
+Global shortcuts are registered system-wide, so while Bepo runs, **`Ctrl + Space` is no longer delivered to other apps** — it is the autocomplete trigger in VS Code, Visual Studio and JetBrains IDEs, and the IME switch on some keyboards. If that bothers you, open **tray → Settings…** and record a different push-to-talk shortcut (e.g. `Ctrl+Alt+Space` or `F9`) or disable it — see [Settings](#-settings). The same goes for undo (`Alt + Win + Z`). If a shortcut can't be registered because another app owns it, Bepo shows a tray notification and the tray menu still works.
 
 ---
 
@@ -206,6 +214,8 @@ Correct mistakes seamlessly hands-free using natural voice commands:
 | **`"Delete last <N> words"`** | Retract multiple words | E.g., *"Delete last 3 words"* or *"Delete last two words"*. |
 | **`"Clear all"`** or **`"Delete all"`** | Clear entire session | Erases all text dictated during the current session. |
 | **In-Flight Self-Correction** | Immediate replacement | Saying *"We meet at six, scratch that, we meet at seven"* automatically discards the first clause before typing and only injects *"We meet at seven"*. |
+
+> **After you have stopped:** voice commands only work while you are dictating. To take back a whole finished dictation, press [`Alt + Win + Z`](#-4-undo-last-dictation).
 
 > **Contextual Safety:** Spoken commands require whole-utterance isolation or punctuation boundaries. Sentences like *"The cat scratch that tree"* are recognized as normal text and are **never** falsely interpreted as commands.
 
@@ -284,7 +294,7 @@ graph TD
     end
 
     subgraph Controller [Qt Event Loop - Main Thread]
-        Hotkey[Win32 Global Hotkey Manager] -->|Ctrl+Win / Ctrl+Space| AppCoordinator[BepoApp Coordinator]
+        Hotkey[Win32 Global Hotkey Manager] -->|Ctrl+Win / Ctrl+Space / Alt+Win+Z| AppCoordinator[BepoApp Coordinator]
         Inference -->|Signal: partial & final| AppCoordinator
         AppCoordinator --> Pill[Floating Pill UI]
         AppCoordinator --> Waveform[Speech Indicator]
@@ -320,7 +330,7 @@ bepo/
 │   ├── emoji.py             # Spoken emoji parser (100+ native Unicode glyphs)
 │   ├── formatting.py        # "New line", "Numbered list", "Next item" ... (layout commands + list state)
 │   ├── engine.py            # Loads the Moonshine model, opens per-dictation mic sessions
-│   ├── hotkey.py            # Configurable Win32 RegisterHotKey shortcuts & PTT release watcher
+│   ├── hotkey.py            # Configurable Win32 RegisterHotKey shortcuts (toggle, push-to-talk, undo) & PTT release watcher
 │   ├── injector.py          # Win32 SendInput Unicode injector with sequential queue
 │   ├── memory.py            # Hands idle working-set memory back to Windows
 │   ├── startup.py           # "Start with Windows" registry entry
@@ -352,7 +362,7 @@ Right-click the Bepo tray icon → **Settings**. Everything applies the moment y
 
 | Section | What you can change |
 |---|---|
-| **Shortcuts** | Click a box and press the new combination for *Start / stop dictation* and *Push-to-talk*; disable either one; choose whether `Esc` finishes dictation. |
+| **Shortcuts** | Click a box and press the new combination for *Start / stop dictation*, *Push-to-talk* and *Undo last dictation*; disable any of them; choose whether `Esc` finishes dictation. |
 | **Dictation** | Type sentence by sentence while you speak, remove filler words, spoken emoji, spoken line breaks and lists (with the line-break key), optional auto-finish after a pause, and how long silence is tolerated before the microphone is released. |
 | **Speech recognition** | **Moonshine model** (Tiny / Small / Medium — a model you haven't used yet is downloaded when you Save), **Responsiveness** (Efficient or Fast), **Microphone** (any input device instead of the Windows default) and **Custom words** (names and jargon Bepo should prefer). |
 | **System & privacy** | Start Bepo when you sign in to Windows, and the optional clipboard safety net. |
@@ -368,6 +378,7 @@ The Settings window edits this JSON file for you; you can also edit it by hand (
 {
   "hotkey_toggle": "ctrl+win",
   "hotkey_ptt": "ctrl+space",
+  "hotkey_undo": "alt+win+z",
   "continuous_mode": true,
   "filter_filler_words": true,
   "enable_emojis": true,
@@ -386,7 +397,7 @@ The Settings window edits this JSON file for you; you can also edit it by hand (
 }
 ```
 
-- `"hotkey_toggle"` / `"hotkey_ptt"`: modifiers (`ctrl`, `alt`, `shift`, `win`) joined with `+`, then a key (`a`–`z`, `0`–`9`, `f1`–`f24`, `space`, `enter`, `tab`, or `win`) — e.g. `"ctrl+alt+d"`, `"f9"`. `""` disables one. Invalid values fall back to the default and show a tray warning.
+- `"hotkey_toggle"` / `"hotkey_ptt"` / `"hotkey_undo"` (defaults `ctrl+win`, `ctrl+space`, `alt+win+z`): modifiers (`ctrl`, `alt`, `shift`, `win`) joined with `+`, then a key (`a`–`z`, `0`–`9`, `f1`–`f24`, `space`, `enter`, `tab`, or `win`) — e.g. `"ctrl+alt+d"`, `"f9"`. `""` disables one. The three must all be different. Invalid values fall back to the default and show a tray warning.
 - `"continuous_mode"`, `"filter_filler_words"`, `"enable_emojis"`, `"esc_to_finish"`: on/off switches for the matching Settings options.
 - `"smart_formatting"`: spoken punctuation (*"comma"*, *"question mark"*, *"period"* at the end of a phrase), numbers (*"twenty five"* → 25, *"three point five percent"* → 3.5%) and addresses (*"name at gmail dot com"*).
 - `"safety_idle_timeout_seconds"`: silence after which the microphone is released (default 180 s).
@@ -453,7 +464,7 @@ Release assets also include a `SHA256SUMS.txt` so you can verify your download.
 - **Microphone only while dictating:** Bepo opens the microphone when you start and releases it when you finish (or when the idle timeout expires) — Windows' microphone-in-use indicator is off in between.
 - **On-device recognition:** Your audio is processed locally. Bepo only uses the network once, to download the speech model on first run (the installer already bundles it) — never during dictation.
 - **Clipboard untouched:** Bepo types with `SendInput` and does not read or write your clipboard. Only if `SendInput` fails does it fall back to a paste, and then your previous clipboard text is restored. The optional `clipboard_safety_net` is **off** by default.
-- **No keystroke logging:** Bepo registers its two shortcuts with Win32 `RegisterHotKey` (no global keyboard hook) and only polls the state of `Esc` (while recording) and of the push-to-talk keys. No other keystrokes are read.
+- **No keystroke logging:** Bepo registers its three shortcuts with Win32 `RegisterHotKey` (no global keyboard hook) and only polls the state of `Esc` (while recording) and of the push-to-talk keys. No other keystrokes are read.
 - **Logs contain no dictated text:** `%LOCALAPPDATA%\Bepo\logs\bepo.log` records diagnostics and character counts only.
 - **Open Source Transparency:** The entire source code is available in this repository for inspection and audit. Please report vulnerabilities as described in [SECURITY.md](SECURITY.md).
 

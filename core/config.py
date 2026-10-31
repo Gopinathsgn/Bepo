@@ -43,6 +43,7 @@ WORD_STRENGTH_BOOST = {"normal": None, "strong": 2.0, "stronger": 3.0}
 DEFAULT_CONFIG = {
     "hotkey_toggle": "ctrl+win",
     "hotkey_ptt": "ctrl+space",
+    "hotkey_undo": "alt+win+z",
     "continuous_mode": True,
     "filter_filler_words": True,
     "enable_emojis": True,
@@ -108,7 +109,7 @@ def normalize(config: dict) -> dict:
     d = DEFAULT_CONFIG
     out = dict(d)
 
-    for key in ("hotkey_toggle", "hotkey_ptt"):
+    for key in ("hotkey_toggle", "hotkey_ptt", "hotkey_undo"):
         value = config.get(key, d[key])
         out[key] = value if (value is None or isinstance(value, str)) else d[key]
 

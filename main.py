@@ -6,6 +6,7 @@ Wires together: setup screen, system tray, settings, hotkey, transcriber, pill, 
 
 import re
 import sys
+import ctypes
 import logging
 from collections import deque
 from pathlib import Path
@@ -33,7 +34,7 @@ from core.injector import (
 from core.cleaner import clean_transcript
 from core.commands import CommandType, parse_voice_command
 from core.formatting import BULLETS, NUMBERED, FormatCommand, ListState, parse_format_command
-from core.hotkey import HotkeyManager, DEFAULT_TOGGLE, DEFAULT_PTT
+from core.hotkey import HotkeyManager, DEFAULT_TOGGLE, DEFAULT_PTT, DEFAULT_UNDO
 from ui.pill import PillWindow
 from ui.setup_screen import SetupScreen
 from ui.settings_dialog import SettingsDialog
@@ -168,8 +169,8 @@ class BepoApp(QObject):
         self._settings_dialog = None
         self._history: deque[str] = deque(maxlen=HISTORY_SIZE)
         self._history_menu = None
-        self._last_dictation: tuple[int, int] | None = None   # (characters typed, window) for "Undo"
         self._session_window: int = 0                        # window the latest segment was typed into
+        self._last_dictation: tuple[int, int] | None = None   # (characters typed, window) for undo
         self._no_speech_streak: int = 0
 
         # Configurable features (re-read by _apply_runtime_settings whenever settings change)
@@ -208,6 +209,7 @@ class BepoApp(QObject):
             parent=self,
             toggle=self._config.get("hotkey_toggle", DEFAULT_TOGGLE),
             ptt=self._config.get("hotkey_ptt", DEFAULT_PTT),
+            undo=self._config.get("hotkey_undo", DEFAULT_UNDO),
         )
 
         # Tray
@@ -228,6 +230,7 @@ class BepoApp(QObject):
         self._hotkey.ptt_pressed.connect(self._on_ptt_pressed)
         self._hotkey.ptt_released.connect(self._on_ptt_released)
         self._hotkey.esc_pressed.connect(self._on_esc_pressed)
+        self._hotkey.undo_activated.connect(self.undo_last_dictation)
         self._hotkey.registration_issue.connect(self._on_hotkey_issue)
 
         # Start loading the model only now that ready/error are connected (see start_loading)
@@ -235,6 +238,27 @@ class BepoApp(QObject):
 
         # Start hotkey listener
         self._hotkey.start()
+
+    def show_welcome_once(self):
+        """First launch only: show the pill with the shortcuts so the user knows how to start."""
+        marker = app_config.APP_DATA_DIR / "welcomed"
+        if marker.exists():
+            return
+        toggle = self._hotkey.toggle_label
+        ptt = self._hotkey.ptt_label
+        if toggle:
+            stop = "Esc" if self._esc_to_finish else toggle
+            text = f"{toggle} to start · {stop} to stop"
+        elif ptt:
+            text = f"Hold {ptt} and speak"
+        else:
+            text = "Start from the tray icon"
+        QTimer.singleShot(600, lambda: self._pill.show_welcome(text))
+        try:
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text("1", encoding="utf-8")
+        except OSError:
+            logging.warning("[Bepo] Could not save the first-run marker", exc_info=True)
 
     def _apply_runtime_settings(self):
         """Copy the settings that are read while dictating into plain attributes."""
@@ -315,8 +339,8 @@ class BepoApp(QObject):
         self._silence_timer.stop()
         self._idle_timer.stop()
         self._trim_timer.stop()
-        self._last_dictation = None
         self._session_window = 0
+        self._last_dictation = None
 
         if self._continuous_mode:
             self._idle_timer.start(int(self._safety_idle_timeout * 1000))
@@ -589,7 +613,7 @@ class BepoApp(QObject):
             self._note_no_speech()
 
     # ------------------------------------------------------------------ #
-    # After a dictation: undo, history, "not hearing you" hint            #
+    # After a dictation: history, "not hearing you" hint            #
     # ------------------------------------------------------------------ #
 
     @staticmethod
@@ -619,7 +643,7 @@ class BepoApp(QObject):
 
     @Slot()
     def undo_last_dictation(self):
-        """Delete the text typed by the last dictation (tray menu), if focus is still where it went."""
+        """Delete the text typed by the last dictation (undo shortcut), if focus is still where it went."""
         if self._recording:
             return
         if self._last_dictation is None:
@@ -685,8 +709,9 @@ class BepoApp(QObject):
         self._config = config = app_config.normalize(new_config)
         self._apply_runtime_settings()
 
-        if (config["hotkey_toggle"], config["hotkey_ptt"]) != (previous["hotkey_toggle"], previous["hotkey_ptt"]):
-            self._hotkey.reconfigure(config["hotkey_toggle"], config["hotkey_ptt"])
+        keys = ("hotkey_toggle", "hotkey_ptt", "hotkey_undo")
+        if [config[k] for k in keys] != [previous[k] for k in keys]:
+            self._hotkey.reconfigure(*(config[k] for k in keys))
         self._transcriber.apply_settings(EngineSettings.from_config(config))
         self._update_tray_state(recording=self._recording)
 
@@ -774,10 +799,6 @@ class BepoApp(QObject):
         self._dictate_action.triggered.connect(self._toggle_recording)
         menu.addAction(self._dictate_action)
 
-        undo_action = QAction("↶  Undo last dictation", self._app)
-        undo_action.triggered.connect(self.undo_last_dictation)
-        menu.addAction(undo_action)
-
         self._history_menu = menu.addMenu("🕘  Recent dictations")
         self._history_menu.aboutToShow.connect(self._rebuild_history_menu)
         self._history_menu.menuAction().setVisible(self._keep_history)
@@ -816,6 +837,11 @@ def main():
 
     config = app_config.load_config()
 
+    try:    # own taskbar identity, so windows show the Bepo icon instead of python.exe's
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Gopinath.Bepo")
+    except Exception:
+        pass
+
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("Bepo")
@@ -834,6 +860,7 @@ def main():
     def launch_main_app():
         app._controller = BepoApp(app, preload=_PRELOAD)
         app.aboutToQuit.connect(app._controller.cleanup)
+        app._controller.show_welcome_once()
 
     if not is_model_downloaded(config["speech_model"]):
         setup = SetupScreen(config["speech_model"])

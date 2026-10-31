@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QComboBox,
     QPlainTextEdit, QScrollArea, QWidget, QFrame, QProgressBar,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtGui import QIcon, QGuiApplication
 
 from core import audio_devices
@@ -244,6 +244,18 @@ class SettingsDialog(QDialog):
         self._load(self._original, launch_at_startup)
         self._size_to_screen()
 
+        # Mouse-wheel over a dropdown must scroll the page, not silently change the setting.
+        for combo in self.findChildren(QComboBox):
+            combo.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            combo.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if (event.type() == QEvent.Type.Wheel and isinstance(obj, QComboBox)
+                and not obj.view().isVisible()):
+            event.ignore()      # let the scroll area underneath handle it
+            return True
+        return super().eventFilter(obj, event)
+
     # ------------------------------------------------------------------ #
     # Layout                                                              #
     # ------------------------------------------------------------------ #
@@ -318,6 +330,11 @@ class SettingsDialog(QDialog):
         self.ptt_off.setObjectName("link")
         self.ptt_off.clicked.connect(lambda: self.ptt_edit.set_value(""))
         lay.addLayout(self._labeled("Push-to-talk (hold)", self.ptt_edit, self.ptt_off))
+        self.undo_edit = HotkeyEdit("", self._suspend, self._resume)
+        self.undo_off = QPushButton("Disable")
+        self.undo_off.setObjectName("link")
+        self.undo_off.clicked.connect(lambda: self.undo_edit.set_value(""))
+        lay.addLayout(self._labeled("Undo last dictation", self.undo_edit, self.undo_off))
         lay.addWidget(self._hint(
             "Click a box, then press the shortcut you want. Note: a shortcut Bepo uses is taken "
             "from every other app — for example Ctrl+Space no longer reaches the autocomplete "
@@ -497,6 +514,7 @@ class SettingsDialog(QDialog):
     def _load(self, cfg: dict, launch_at_startup: bool):
         self.toggle_edit.set_value(cfg["hotkey_toggle"])
         self.ptt_edit.set_value(cfg["hotkey_ptt"])
+        self.undo_edit.set_value(cfg["hotkey_undo"])
         self.esc_check.setChecked(cfg["esc_to_finish"])
         self.continuous_check.setChecked(cfg["continuous_mode"])
         self.fillers_check.setChecked(cfg["filter_filler_words"])
@@ -550,6 +568,7 @@ class SettingsDialog(QDialog):
         cfg = dict(self._original)
         cfg["hotkey_toggle"] = self.toggle_edit.value()
         cfg["hotkey_ptt"] = self.ptt_edit.value()
+        cfg["hotkey_undo"] = self.undo_edit.value()
         cfg["esc_to_finish"] = self.esc_check.isChecked()
         cfg["continuous_mode"] = self.continuous_check.isChecked()
         cfg["filter_filler_words"] = self.fillers_check.isChecked()
@@ -572,9 +591,10 @@ class SettingsDialog(QDialog):
         return app_config.normalize(cfg)
 
     def _validate(self, cfg: dict) -> str | None:
-        toggle, ptt = cfg["hotkey_toggle"], cfg["hotkey_ptt"]
-        if toggle and ptt and toggle == ptt:
-            return "The two shortcuts must be different."
+        toggle, ptt, undo = cfg["hotkey_toggle"], cfg["hotkey_ptt"], cfg["hotkey_undo"]
+        chosen = [k for k in (toggle, ptt, undo) if k]
+        if len(chosen) != len(set(chosen)):
+            return "The shortcuts must all be different."
         if not toggle and not ptt:
             return "Keep at least one shortcut, or you will only be able to start Bepo from the tray menu."
         return None
@@ -646,7 +666,7 @@ class SettingsDialog(QDialog):
 
     def done(self, result):
         # Never leave Bepo's own shortcuts suspended if the window closes mid-capture
-        for edit in (self.toggle_edit, self.ptt_edit):
+        for edit in (self.toggle_edit, self.ptt_edit, self.undo_edit):
             edit._end_capture()
         self._pending = None            # closing the window cancels the pending save
         super().done(result)

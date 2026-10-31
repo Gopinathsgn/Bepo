@@ -1,6 +1,7 @@
 {
   "hotkey_toggle": "ctrl+win",
   "hotkey_ptt": "ctrl+space",
+  "hotkey_undo": "alt+win+z",
   "continuous_mode": true,
   "filter_filler_words": true,
   "enable_emojis": true,

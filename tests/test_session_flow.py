@@ -59,9 +59,10 @@ class FakeHotkey(QObject):
     ptt_pressed = Signal()
     ptt_released = Signal()
     esc_pressed = Signal()
+    undo_activated = Signal()
     registration_issue = Signal(str)
 
-    def __init__(self, parent=None, toggle=None, ptt=None):
+    def __init__(self, parent=None, toggle=None, ptt=None, undo=None):
         super().__init__(parent)
         self.toggle_label = "Ctrl+Win"
         self.ptt_label = "Ctrl+Space"
@@ -80,8 +81,8 @@ class FakeHotkey(QObject):
     def resume(self):
         self.calls.append("resume")
 
-    def reconfigure(self, toggle, ptt):
-        self.reconfigured.append((toggle, ptt))
+    def reconfigure(self, toggle, ptt, undo=None):
+        self.reconfigured.append((toggle, ptt, undo))
 
     def start_esc_watcher(self):
         pass
@@ -371,7 +372,7 @@ class SessionFlowTests(unittest.TestCase):
         self.ctrl.apply_settings(self._config(enable_emojis=False))
         self.assertEqual(self.ctrl._hotkey.reconfigured, [])
         self.ctrl.apply_settings(self._config(hotkey_ptt="ctrl+alt+space"))
-        self.assertEqual(self.ctrl._hotkey.reconfigured, [("ctrl+win", "ctrl+alt+space")])
+        self.assertEqual(self.ctrl._hotkey.reconfigured, [("ctrl+win", "ctrl+alt+space", "alt+win+z")])
 
     def test_apply_settings_forwards_engine_settings(self):
         self.ctrl.apply_settings(self._config(speech_model="medium", responsiveness="fast",
@@ -466,7 +467,7 @@ class SessionFlowTests(unittest.TestCase):
         self.say("Hello world.")
         self.say("Second one.")
         self.stop("Hello world. Second one.")
-        self.ctrl.undo_last_dictation()
+        self.ctrl._hotkey.undo_activated.emit()
         self.assertEqual(self.deletions, [len("Hello world. Second one.")])
         self.ctrl.undo_last_dictation()                 # nothing left to undo
         self.assertEqual(len(self.deletions), 1)

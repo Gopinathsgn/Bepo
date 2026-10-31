@@ -193,7 +193,7 @@ class HotkeyReregistrationTests(unittest.TestCase):
         patch = mock.patch.object(HotkeyManager, "_register", staticmethod(lambda *a: True))
         patch.start()
         self.addCleanup(patch.stop)
-        self.manager = HotkeyManager(toggle="ctrl+alt+f10", ptt="ctrl+alt+f11")
+        self.manager = HotkeyManager(toggle="ctrl+alt+f10", ptt="ctrl+alt+f11", undo="")
         self.addCleanup(self.manager.stop)
         self.issues = []
         self.manager.registration_issue.connect(self.issues.append)
@@ -204,6 +204,24 @@ class HotkeyReregistrationTests(unittest.TestCase):
         self.manager.reconfigure("ctrl+alt+f9", "")
         self.assertEqual(self.manager._registered, ["ctrl+alt+f9 (toggle)"])
         self.assertEqual((self.manager.toggle_label, self.manager.ptt_label), ("Ctrl+Alt+F9", ""))
+
+    def test_undo_shortcut_registers_and_survives_reconfigure(self):
+        self.manager.reconfigure("ctrl+alt+f10", "ctrl+alt+f11", "ctrl+alt+f12")
+        self.assertEqual(self.manager.undo_label, "Ctrl+Alt+F12")
+        self.assertIn("ctrl+alt+f12 (undo)", self.manager._registered)
+        self.manager.reconfigure("ctrl+alt+f9", "")                  # undo left out: kept as it was
+        self.assertEqual(self.manager.undo_label, "Ctrl+Alt+F12")
+
+    def test_undo_shortcut_cannot_duplicate_another(self):
+        self.manager.reconfigure("ctrl+alt+f10", "ctrl+alt+f11", "ctrl+alt+f10")
+        self._app.processEvents()
+        self.assertEqual(self.manager.undo_label, "")
+        self.assertEqual(len(self.issues), 1)
+
+    def test_default_undo_shortcut_does_not_start_with_the_toggle(self):
+        from core.hotkey import DEFAULT_TOGGLE, DEFAULT_UNDO, parse_hotkey
+        toggle, undo = parse_hotkey(DEFAULT_TOGGLE), parse_hotkey(DEFAULT_UNDO)
+        self.assertFalse(set(toggle.held) <= set(undo.held))   # else the toggle fires before the key
 
     def test_suspend_and_resume(self):
         self.manager.start()

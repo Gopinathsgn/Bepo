@@ -178,6 +178,19 @@ class ValidationTests(DialogTestCase):
         self.assertEqual(self.saved, [])
         self.assertFalse(d.status_label.isHidden())
 
+    def test_undo_shortcut_equal_to_another_is_rejected(self):
+        d = self.make()
+        d.undo_edit.set_value(d.ptt_edit.value())
+        d._on_save()
+        self.assertEqual(self.saved, [])
+
+    def test_undo_shortcut_round_trips_and_can_be_disabled(self):
+        d = self.make()
+        self.assertEqual(d.undo_edit.value(), "alt+win+z")
+        d.undo_off.click()
+        d._on_save()
+        self.assertEqual(self.saved[0][0]["hotkey_undo"], "")
+
     def test_no_shortcut_at_all_is_rejected(self):
         d = self.make()
         d.toggle_edit.set_value("")

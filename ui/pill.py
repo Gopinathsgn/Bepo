@@ -43,6 +43,7 @@ DOT_COLORS = {
     "streaming": QColor(255, 159, 10,  255),   # #FF9F0A Amber
     "done":      QColor(48,  209, 88,  255),   # #30D158 Mint Green
     "error":     QColor(160, 160, 165, 200),   # Subtle Gray
+    "welcome":   QColor(96,  165, 250, 255),   # #60A5FA Sky Blue
 }
 
 # Capsule dimensions
@@ -58,6 +59,7 @@ class PillState(Enum):
     STREAMING = auto()
     DONE      = auto()
     ERROR     = auto()
+    WELCOME   = auto()
 
 
 class DotWidget(QWidget):
@@ -240,6 +242,21 @@ class PillWindow(QWidget):
             self._apply_dwm()
             self._dwm_applied = True
 
+    def show_welcome(self, text: str, duration_ms: int = 15000):
+        """First-run greeting: tells the user how to dictate. Gives way to the first dictation."""
+        self._set_state(PillState.WELCOME)
+        self._text_label.setText(text)
+        self._hint_badge.hide()
+        self._slide_to(show=True)
+        if not self._dwm_applied:
+            self._apply_dwm()
+            self._dwm_applied = True
+        QTimer.singleShot(duration_ms, self._hide_welcome)
+
+    def _hide_welcome(self):
+        if self._state == PillState.WELCOME:
+            self._slide_to_hide()
+
     def set_level(self, level: float):
         """Microphone loudness 0..1: the waveform shows whether Bepo is hearing you."""
         self._waveform.set_level(level)
@@ -308,6 +325,7 @@ class PillWindow(QWidget):
             PillState.STREAMING: "Streaming",
             PillState.DONE:      "Done ✓",
             PillState.ERROR:     "No speech",
+            PillState.WELCOME:   "Welcome",
         }
         self._status_label.setText(labels.get(state, ""))
 

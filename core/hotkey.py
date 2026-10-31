@@ -5,6 +5,7 @@ Global hotkey manager for Bepo.
 Default Hotkeys (configurable via "hotkey_toggle" / "hotkey_ptt" in config.json):
   1. Ctrl + Win   — Toggle mode (Tap to start, tap again to finish)
   2. Ctrl + Space — Push-to-Talk mode (Hold to speak, release to finish)
+  3. Alt + Win + Z — Undo the last dictation ("hotkey_undo")
 
 Implementation:
   - Win32 RegisterHotKey with MOD_NOREPEAT.
@@ -46,9 +47,14 @@ HOTKEY_ID_TOGGLE_L = 1
 HOTKEY_ID_TOGGLE_R = 2
 HOTKEY_ID_PTT      = 3
 HOTKEY_ID_PTT_R    = 4
+HOTKEY_ID_UNDO_L   = 5
+HOTKEY_ID_UNDO_R   = 6
 
 DEFAULT_TOGGLE = "ctrl+win"
 DEFAULT_PTT    = "ctrl+space"
+# Not Ctrl+Win+Z: Ctrl+Win is the toggle shortcut and fires the moment both keys are down, before Z.
+DEFAULT_UNDO   = "alt+win+z"
+_KEEP = object()   # reconfigure(): leave the undo shortcut as it is
 
 _MODIFIER_NAMES = {
     "ctrl": "ctrl", "control": "ctrl",
@@ -131,6 +137,7 @@ class HotkeyManager(QObject):
       - ptt_pressed:      emitted on the push-to-talk hotkey down (default Ctrl+Space)
       - ptt_released:     emitted when the push-to-talk combination is released
       - esc_pressed:      emitted when Esc is pressed while recording
+      - undo_activated:   emitted on the undo shortcut (default Alt+Win+Z)
       - registration_issue: human-readable problem (bad config, shortcut already taken)
     """
 
@@ -138,11 +145,12 @@ class HotkeyManager(QObject):
     ptt_pressed        = Signal()
     ptt_released       = Signal()
     esc_pressed        = Signal()
+    undo_activated     = Signal()
     registration_issue = Signal(str)
     activated          = toggle_activated   # backward compatibility alias
 
     def __init__(self, parent=None, toggle: str | None = DEFAULT_TOGGLE,
-                 ptt: str | None = DEFAULT_PTT):
+                 ptt: str | None = DEFAULT_PTT, undo: str | None = DEFAULT_UNDO):
         super().__init__(parent)
         self._thread: threading.Thread | None = None
         self._thread_id: int | None = None
@@ -151,9 +159,9 @@ class HotkeyManager(QObject):
         self._esc_watching = False
         self._issues: list[str] = []
         self._registered: list[str] = []
-        self._set_specs(toggle, ptt)
+        self._set_specs(toggle, ptt, undo)
 
-    def _set_specs(self, toggle, ptt):
+    def _set_specs(self, toggle, ptt, undo):
         self._toggle = self._resolve(toggle, DEFAULT_TOGGLE, "toggle")
         self._ptt = self._resolve(ptt, DEFAULT_PTT, "push-to-talk")
         if self._toggle and self._ptt and self._toggle.text == self._ptt.text:
@@ -161,6 +169,11 @@ class HotkeyManager(QObject):
                 f"Toggle and push-to-talk both use '{self._ptt.text}'; push-to-talk is disabled."
             )
             self._ptt = None
+        self._undo = self._resolve(undo, DEFAULT_UNDO, "undo")
+        taken = {s.text for s in (self._toggle, self._ptt) if s}
+        if self._undo and self._undo.text in taken:
+            self._issues.append(f"The undo shortcut duplicates '{self._undo.text}'; undo is disabled.")
+            self._undo = None
 
     def _resolve(self, value, default: str, label: str) -> HotkeySpec | None:
         """Parse a configured hotkey. Empty/None disables it; invalid falls back to default."""
@@ -187,6 +200,11 @@ class HotkeyManager(QObject):
     def ptt_label(self) -> str:
         """Display text of the push-to-talk hotkey (e.g. "Ctrl+Space"), or "" if disabled."""
         return self._pretty(self._ptt)
+
+    @property
+    def undo_label(self) -> str:
+        """Display text of the undo shortcut (e.g. "Alt+Win+Z"), or "" if disabled."""
+        return self._pretty(self._undo)
 
     def start(self):
         """Start hotkey listener on dedicated background message pump."""
@@ -230,10 +248,12 @@ class HotkeyManager(QObject):
         if self._thread is None:
             self.start()
 
-    def reconfigure(self, toggle: str | None, ptt: str | None):
+    def reconfigure(self, toggle: str | None, ptt: str | None, undo=_KEEP):
         """Apply new shortcuts at runtime (problems are reported via registration_issue)."""
         self.stop()
-        self._set_specs(toggle, ptt)
+        if undo is _KEEP:
+            undo = self._undo.text if self._undo else None
+        self._set_specs(toggle, ptt, undo)
         self.start()
 
     def start_esc_watcher(self):
@@ -305,6 +325,20 @@ class HotkeyManager(QObject):
                         "another app may be using it. Change \"hotkey_ptt\" in the settings file "
                         "(tray menu > Open Settings File)."
                     )
+
+            if self._undo is not None:
+                results = [
+                    self._register(HOTKEY_ID_UNDO_L + i, self._undo, vk)
+                    for i, vk in enumerate(self._undo.vks)
+                ]
+                registered_ids += [HOTKEY_ID_UNDO_L + i for i, ok in enumerate(results) if ok]
+                if any(results):
+                    self._registered.append(f"{self._undo.text} (undo)")
+                else:
+                    self._issues.append(
+                        f"Could not register the undo shortcut '{self._undo.text}' - "
+                        "another app may be using it. Change it in Settings."
+                    )
         finally:
             self._ready_event.set()
 
@@ -319,6 +353,8 @@ class HotkeyManager(QObject):
                     self.toggle_activated.emit()
                 elif hotkey_id in (HOTKEY_ID_PTT, HOTKEY_ID_PTT_R):
                     self._on_ptt_pressed()
+                elif hotkey_id in (HOTKEY_ID_UNDO_L, HOTKEY_ID_UNDO_R):
+                    self.undo_activated.emit()
 
         for hotkey_id in registered_ids:
             user32.UnregisterHotKey(None, hotkey_id)
