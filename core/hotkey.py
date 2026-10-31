@@ -42,6 +42,7 @@ VK_RWIN      = 0x5C
 
 WM_HOTKEY    = 0x0312
 WM_QUIT      = 0x0012
+WM_USER      = 0x0400
 
 HOTKEY_ID_TOGGLE_L = 1
 HOTKEY_ID_TOGGLE_R = 2
@@ -230,13 +231,22 @@ class HotkeyManager(QObject):
         self.stop_esc_watcher()
         thread, thread_id = self._thread, self._thread_id
         self._thread_id = None
-        if thread_id is not None:
+        if thread is not None and thread is not threading.current_thread():
+            # Retry: the post fails while the thread is still setting up its queue.
+            deadline = time.monotonic() + 1.0
+            while thread.is_alive() and time.monotonic() < deadline:
+                if thread_id is not None:
+                    try:
+                        ctypes.windll.user32.PostThreadMessageW(thread_id, WM_QUIT, 0, 0)
+                    except Exception:
+                        pass
+                thread.join(timeout=0.05)
+                thread_id = thread_id or self._thread_id
+        elif thread_id is not None:
             try:
                 ctypes.windll.user32.PostThreadMessageW(thread_id, WM_QUIT, 0, 0)
             except Exception:
                 pass
-        if thread is not None and thread is not threading.current_thread():
-            thread.join(timeout=1.0)
         self._thread = None
 
     def suspend(self):
@@ -294,6 +304,9 @@ class HotkeyManager(QObject):
         registered_ids: list[int] = []
 
         try:
+            # A thread only gets a message queue on its first message call; until then
+            # PostThreadMessageW(WM_QUIT) fails and stop() could never end the loop.
+            user32.PeekMessageW(ctypes.byref(ctypes.wintypes.MSG()), None, WM_USER, WM_USER, 0)
             self._thread_id = kernel32.GetCurrentThreadId()
 
             if self._toggle is not None:
