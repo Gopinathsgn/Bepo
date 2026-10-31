@@ -12,9 +12,12 @@ themselves; the license text of most Python packages shipped in a release build 
 - **Model:** release builds bundle the English *small streaming* model (downloaded from `download.moonshine.ai`
   on first run for source installs).
 
-  Moonshine states that its **non-English** models are under the non-commercial *Moonshine Community License*;
-  Bepo only uses the English model. The authoritative terms for the model weights are published at
-  <https://www.moonshine.ai/license> — please check them before redistributing the weights in your own build.
+  **Model licence:** Moonshine's `LICENSE` (<https://github.com/moonshine-ai/moonshine/blob/main/LICENSE>) puts every
+  streaming model and every English model under the MIT licence below (checked 31 October 2026). Only some legacy
+  non-streaming models in other languages (Arabic, Japanese, Korean, Mandarin, Spanish, Ukrainian, Vietnamese) are under
+  the non-commercial *Moonshine Community License*. Bepo uses only the English streaming models (Tiny, Small, Medium),
+  so none of them is affected. Moonshine's published terms are at <https://www.moonshine.ai/license>; check them again
+  if you bundle a different model.
 
 ```
 MIT License
