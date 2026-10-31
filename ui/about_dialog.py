@@ -40,7 +40,7 @@ class AboutDialog(QDialog):
             Qt.WindowType.Dialog |
             Qt.WindowType.WindowCloseButtonHint
         )
-        self.setFixedSize(440, 330)
+        self.setFixedWidth(440)  # height is derived from the content in _build_ui
         self.setStyleSheet("""
             QDialog {
                 background: #1C1C1E;
@@ -96,7 +96,7 @@ class AboutDialog(QDialog):
         # Attribution: one quiet line
         author_line = QLabel(
             'Made by Gopinath · '
-            '<a href="https://github.com/Gopinathsgn" style="color: rgba(255, 255, 255, 0.6);">GitHub</a>'
+            '<a href="https://github.com/Gopinathsgn/Bepo" style="color: rgba(255, 255, 255, 0.6);">GitHub</a>'
         )
         author_line.setFont(QFont(UI_FONT, 10))
         author_line.setOpenExternalLinks(True)
@@ -147,6 +147,9 @@ class AboutDialog(QDialog):
         btn_row.addWidget(close_btn)
 
         layout.addLayout(btn_row)
+
+        # Never crop wrapped text: size the window from the content at this width.
+        self.setFixedHeight(layout.totalHeightForWidth(self.width()))
 
     def showEvent(self, event):
         super().showEvent(event)
