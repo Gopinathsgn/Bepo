@@ -37,7 +37,9 @@
 </p>
 
 <p align="center">
-  <img src="assets/preview-hero.png" alt="Bepo Floating Overlay Preview" width="820">
+  <img src="assets/demo.gif" alt="Bepo typing 'Blazing fast offline voice typing for windows' into a note while the floating pill shows the live transcript" width="640">
+  <br>
+  <sub>Press <code>Ctrl + Win</code>, speak, and Bepo types at your cursor while the pill streams the transcript live.</sub>
 </p>
 
 ---
@@ -143,6 +145,12 @@ Because Bepo is a background tool for ordinary laptops. It has to sit in your tr
 2. Run the installer (installs into `%LOCALAPPDATA%`, **no Admin rights required**).
 3. Launch Bepo from the Start Menu or Desktop shortcut.
 4. Bepo greets you with the pill on first launch, showing how to start and stop. Press `Ctrl + Win` (or hold `Ctrl + Space`) to begin dictating!
+
+Bepo then lives in your system tray. Right-click its icon to start dictation, open **Help** or **Settings**, or quit:
+
+<p align="center">
+  <img src="assets/screenshot-tray.png" alt="Bepo tray menu with Start Dictation, Help, Settings and Quit Bepo" width="300">
+</p>
 
 > 🛡️ **Windows SmartScreen:** the installer is not code-signed yet, so Windows may show *"Windows protected your PC"*. Click **More info → Run anyway**. If you'd rather not trust a binary, [run from source](#option-b-run-from-source) — the whole app is plain, readable Python (about 4,000 lines).
 
@@ -320,7 +328,8 @@ bepo/
 │   ├── logo-light.svg       # Dark vector for light backgrounds
 │   ├── check.svg            # Checkbox tick used by the Settings window
 │   ├── chevron-down.svg     # Dropdown arrow used by the Settings window
-│   └── preview-hero.png     # README preview image
+│   ├── demo.gif             # README demo (dictating into a note)
+│   └── screenshot-*.png     # README screenshots (tray menu, Settings, Help)
 ├── core/
 │   ├── audio_devices.py     # Microphone list / lookup for the Settings window
 │   ├── bootstrap.py         # Earliest start-up work (logging, single instance, model preload)
@@ -362,6 +371,21 @@ bepo/
 ## ⚙️ Settings
 
 Right-click the Bepo tray icon → **Settings**. Everything applies the moment you press **Save** — no restart.
+
+<table align="center">
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <img src="assets/screenshot-settings.png" alt="Bepo Settings window showing shortcuts and dictation options" width="100%">
+    </td>
+    <td align="center" valign="top" width="50%">
+      <img src="assets/screenshot-help.png" alt="Bepo Help window listing shortcuts and voice commands, with a Try it box" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Settings</b> — tray → Settings</sub></td>
+    <td align="center"><sub><b>Help</b> — tray → Help, with a <i>Try it</i> box to practise in</sub></td>
+  </tr>
+</table>
 
 | Section | What you can change |
 |---|---|
