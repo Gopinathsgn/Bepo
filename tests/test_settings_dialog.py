@@ -87,7 +87,9 @@ class RoundTripTests(DialogTestCase):
                                 "speech_model": "tiny", "responsiveness": "fast",
                                 "safety_idle_timeout_seconds": 90, "pause_duration_seconds": 3.0,
                                 "auto_stop_on_pause": True, "continuous_mode": False,
-                                "voice_formatting": False, "line_break_key": "enter"})
+                                "voice_formatting": False, "line_break_key": "enter",
+                                "smart_formatting": False, "keep_history": True,
+                                "custom_word_strength": "strong"})
         self.assertEqual(self.make(cfg).collect(), cfg)
 
     def test_line_break_key_is_only_available_with_spoken_formatting(self):

@@ -36,6 +36,10 @@ LINE_BREAK_KEYS = ("shift_enter", "enter")
 # speaking, at the cost of sentences being typed a fraction of a second later.
 RESPONSIVENESS_SECONDS = {"efficient": 1.0, "fast": 0.5}
 
+# How strongly custom words are favoured (Moonshine's `keyterm_boost`, applied when the model loads).
+# "normal" leaves the library default untouched.
+WORD_STRENGTH_BOOST = {"normal": None, "strong": 2.0, "stronger": 3.0}
+
 DEFAULT_CONFIG = {
     "hotkey_toggle": "ctrl+win",
     "hotkey_ptt": "ctrl+space",
@@ -43,14 +47,17 @@ DEFAULT_CONFIG = {
     "filter_filler_words": True,
     "enable_emojis": True,
     "voice_formatting": True,
+    "smart_formatting": True,
     "line_break_key": "shift_enter",
     "safety_idle_timeout_seconds": 180.0,
     "auto_stop_on_pause": False,
     "pause_duration_seconds": 2.0,
     "esc_to_finish": True,
     "clipboard_safety_net": False,
+    "keep_history": False,
     "speech_model": "small",
     "responsiveness": "efficient",
+    "custom_word_strength": "normal",
     "microphone": None,
     "custom_vocabulary": [],
 }
@@ -106,6 +113,7 @@ def normalize(config: dict) -> dict:
         out[key] = value if (value is None or isinstance(value, str)) else d[key]
 
     for key in ("continuous_mode", "filter_filler_words", "enable_emojis", "voice_formatting",
+                "smart_formatting", "keep_history",
                 "auto_stop_on_pause", "esc_to_finish", "clipboard_safety_net"):
         out[key] = _as_bool(config.get(key, d[key]), d[key])
 
@@ -119,6 +127,9 @@ def normalize(config: dict) -> dict:
 
     resp = config.get("responsiveness", d["responsiveness"])
     out["responsiveness"] = resp if resp in RESPONSIVENESS_SECONDS else d["responsiveness"]
+
+    strength = config.get("custom_word_strength", d["custom_word_strength"])
+    out["custom_word_strength"] = strength if strength in WORD_STRENGTH_BOOST else d["custom_word_strength"]
 
     key = config.get("line_break_key", d["line_break_key"])
     out["line_break_key"] = key if key in LINE_BREAK_KEYS else d["line_break_key"]

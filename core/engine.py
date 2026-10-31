@@ -16,7 +16,7 @@ import threading
 from dataclasses import dataclass
 
 from core import audio_devices
-from core.config import update_interval as _update_interval
+from core.config import WORD_STRENGTH_BOOST, update_interval as _update_interval
 from setup import model_downloader
 
 
@@ -26,6 +26,7 @@ class EngineSettings:
     update_interval: float = 1.0
     device: str | None = None
     vocabulary: tuple[str, ...] = ()
+    keyterm_boost: float | None = None      # None = library default; applied when the model loads
 
     @classmethod
     def from_config(cls, config: dict) -> "EngineSettings":
@@ -34,10 +35,11 @@ class EngineSettings:
             update_interval=_update_interval(config),
             device=config.get("microphone"),
             vocabulary=tuple(config.get("custom_vocabulary") or ()),
+            keyterm_boost=WORD_STRENGTH_BOOST.get(config.get("custom_word_strength", "normal")),
         )
 
 
-def load_transcriber(model_key: str, vocabulary=()):
+def load_transcriber(model_key: str, vocabulary=(), keyterm_boost: float | None = None):
     """Load a model from disk (never downloads). Blocking: run it on a worker thread."""
     from moonshine_voice import Transcriber
 
@@ -45,7 +47,8 @@ def load_transcriber(model_key: str, vocabulary=()):
     if path is None:
         raise RuntimeError(f"The {model_downloader.MODELS[model_key].label} speech model is not downloaded")
     logging.info("[Engine] Loading %s model from %s", model_key, path)
-    transcriber = Transcriber(str(path), model_downloader.model_arch(model_key))
+    options = {"keyterm_boost": keyterm_boost} if keyterm_boost is not None else None
+    transcriber = Transcriber(str(path), model_downloader.model_arch(model_key), options=options)
     apply_vocabulary(transcriber, vocabulary)
     _prewarm(transcriber)
     return transcriber
@@ -92,6 +95,41 @@ def open_session(transcriber, settings: EngineSettings, on_text, on_line, on_err
     return mic
 
 
+class _LevelQueue:
+    """Wraps the MicTranscriber's audio queue to measure the loudness of what the microphone hears."""
+
+    def __init__(self, inner, on_level):
+        self._inner = inner
+        self._on_level = on_level
+
+    def put(self, item, *args, **kwargs):
+        try:
+            audio = item[0]
+            rms = float((audio.astype("float32") ** 2).mean() ** 0.5)
+            self._on_level(min(1.0, rms * 8.0))      # speech is typically 0.02-0.15 RMS
+        except Exception:
+            pass
+        return self._inner.put(item, *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+def attach_level_meter(session, on_level) -> bool:
+    """
+    Report the microphone loudness (0..1) to `on_level` while `session` listens, for the pill's
+    waveform. Uses a MicTranscriber internal, so it quietly does nothing if the library changes.
+    """
+    try:
+        queue_ = session._audio_queue
+        if not hasattr(queue_, "put"):
+            return False
+        session._audio_queue = _LevelQueue(queue_, on_level)
+        return True
+    except Exception:
+        return False
+
+
 class Preloader(threading.Thread):
     """Loads the model in the background as early as possible during start-up."""
 
@@ -103,7 +141,9 @@ class Preloader(threading.Thread):
 
     def run(self):
         try:
-            self.transcriber = load_transcriber(self.settings.model, self.settings.vocabulary)
+            self.transcriber = load_transcriber(
+                self.settings.model, self.settings.vocabulary, self.settings.keyterm_boost
+            )
         except BaseException as exc:      # reported by whoever collects the result
             self.error = exc
 

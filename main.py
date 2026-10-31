@@ -7,6 +7,7 @@ Wires together: setup screen, system tray, settings, hotkey, transcriber, pill, 
 import re
 import sys
 import logging
+from collections import deque
 from pathlib import Path
 
 from core import bootstrap
@@ -26,7 +27,9 @@ from core import memory, startup
 from core.engine import EngineSettings
 from setup.model_downloader import is_model_downloaded
 from core.transcriber import TranscriberThread
-from core.injector import configure as configure_injector, enqueue_injection, enqueue_deletion
+from core.injector import (
+    configure as configure_injector, enqueue_injection, enqueue_deletion, foreground_window,
+)
 from core.cleaner import clean_transcript
 from core.commands import CommandType, parse_voice_command
 from core.formatting import BULLETS, NUMBERED, FormatCommand, ListState, parse_format_command
@@ -37,6 +40,11 @@ from ui.settings_dialog import SettingsDialog
 
 # Seconds of idleness before Bepo hands its idle memory back to Windows
 IDLE_TRIM_DELAY_MS = 15_000
+
+# Consecutive empty dictations before Bepo suggests checking the microphone
+NO_SPEECH_HINT_AFTER = 2
+# Dictations remembered for the tray's "Recent dictations" menu (memory only, opt-in)
+HISTORY_SIZE = 10
 
 
 def _load_config() -> dict:
@@ -158,6 +166,11 @@ class BepoApp(QObject):
         self._last_partial: str = ""
         self._has_spoken: bool = False
         self._settings_dialog = None
+        self._history: deque[str] = deque(maxlen=HISTORY_SIZE)
+        self._history_menu = None
+        self._last_dictation: tuple[int, int] | None = None   # (characters typed, window) for "Undo"
+        self._session_window: int = 0                        # window the latest segment was typed into
+        self._no_speech_streak: int = 0
 
         # Configurable features (re-read by _apply_runtime_settings whenever settings change)
         self._apply_runtime_settings()
@@ -208,6 +221,7 @@ class BepoApp(QObject):
         self._transcriber.error.connect(self._on_transcriber_error)
         self._transcriber.ready.connect(self._on_transcriber_ready)
         self._transcriber.loading.connect(self._on_transcriber_loading)
+        self._transcriber.level.connect(self._on_level)
 
         # Hotkey signals (Toggle, Push-to-Talk, Esc finish)
         self._hotkey.toggle_activated.connect(self._toggle_recording)
@@ -233,6 +247,12 @@ class BepoApp(QObject):
         self._auto_stop_on_pause = c["auto_stop_on_pause"]
         self._pause_seconds = c["pause_duration_seconds"]
         self._esc_to_finish = c["esc_to_finish"]
+        self._smart_formatting = c["smart_formatting"]
+        self._keep_history = c["keep_history"]
+        if not self._keep_history:
+            self._history.clear()
+        if self._history_menu is not None:
+            self._history_menu.menuAction().setVisible(self._keep_history)
         configure_injector(clipboard_safety_net=c["clipboard_safety_net"], line_break_key=c["line_break_key"])
 
     # ------------------------------------------------------------------ #
@@ -295,6 +315,8 @@ class BepoApp(QObject):
         self._silence_timer.stop()
         self._idle_timer.stop()
         self._trim_timer.stop()
+        self._last_dictation = None
+        self._session_window = 0
 
         if self._continuous_mode:
             self._idle_timer.start(int(self._safety_idle_timeout * 1000))
@@ -334,6 +356,10 @@ class BepoApp(QObject):
     @Slot()
     def _on_transcriber_loading(self):
         self._tray.setToolTip("Bepo: Loading speech model...")
+
+    @Slot(float)
+    def _on_level(self, level: float):
+        self._pill.set_level(level)
 
     @Slot(str)
     def _on_partial(self, text: str):
@@ -383,7 +409,8 @@ class BepoApp(QObject):
         cleaned = clean_transcript(
             remaining,
             filter_fillers=self._filter_fillers,
-            enable_emojis=self._enable_emojis
+            enable_emojis=self._enable_emojis,
+            smart_formatting=self._smart_formatting,
         )
         if not cleaned:
             logging.info("[Bepo] Filtered out hesitation filler (%d chars)", len(raw_text))
@@ -408,6 +435,7 @@ class BepoApp(QObject):
         self._session_injected_text += text
         self._session_segments_count += 1
         self._session_had_output = True
+        self._session_window = foreground_window()
         # Enqueue text for sequential background injection (safe against interleaving)
         enqueue_injection(text, self._session_injected_text)
 
@@ -438,6 +466,12 @@ class BepoApp(QObject):
 
         if not self._session_injected_text and not self._session_segments:
             self._pill.notify_deleted("Nothing to delete")
+            return
+
+        if not self._same_window(self._session_window):
+            # Backspaces go to whatever has focus: never delete in a window we didn't type into
+            logging.info("[Bepo] Voice deletion skipped: focus moved to another window")
+            self._pill.notify_deleted("Window changed - nothing deleted")
             return
 
         if cmd_type == CommandType.SCRATCH_THAT:
@@ -519,8 +553,10 @@ class BepoApp(QObject):
             if self._session_had_output:
                 self._pill.show_done(self._session_injected_text)
                 _play_earcon("done")
+                self._finish_dictation(self._session_injected_text, self._session_window)
             else:
                 self._pill.show_error("No speech detected")
+                self._note_no_speech()
             return
 
         # PTT, non-continuous mode, or nothing was handled live: inject the whole transcript now
@@ -535,18 +571,85 @@ class BepoApp(QObject):
             return
         if not remaining:
             self._pill.show_error("No speech detected")
+            self._note_no_speech()
             return
         cleaned = clean_transcript(
             remaining,
             filter_fillers=self._filter_fillers,
-            enable_emojis=self._enable_emojis
+            enable_emojis=self._enable_emojis,
+            smart_formatting=self._smart_formatting,
         )
         if cleaned:
             enqueue_injection(cleaned, cleaned)
             self._pill.show_done(cleaned)
             _play_earcon("done")
+            self._finish_dictation(cleaned, foreground_window())
         else:
             self._pill.show_error("No speech detected")
+            self._note_no_speech()
+
+    # ------------------------------------------------------------------ #
+    # After a dictation: undo, history, "not hearing you" hint            #
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _same_window(expected: int) -> bool:
+        """False only when we know text went into a window other than the one focused now."""
+        current = foreground_window()
+        return not expected or not current or current == expected
+
+    def _finish_dictation(self, text: str, window: int):
+        self._no_speech_streak = 0
+        if text:
+            self._last_dictation = (len(text), window)
+            if self._keep_history and text.strip():
+                self._history.appendleft(text.strip())
+
+    def _note_no_speech(self):
+        self._no_speech_streak += 1
+        if self._no_speech_streak >= NO_SPEECH_HINT_AFTER:
+            self._no_speech_streak = 0
+            mic = self._config.get("microphone") or "System default"
+            self._tray.showMessage(
+                "Bepo can't hear you",
+                f"Microphone in use: {mic}. Check it under Settings > Microphone, "
+                "make sure it isn't muted, or try a larger speech model.",
+                QSystemTrayIcon.MessageIcon.Warning, 8000,
+            )
+
+    @Slot()
+    def undo_last_dictation(self):
+        """Delete the text typed by the last dictation (tray menu), if focus is still where it went."""
+        if self._recording:
+            return
+        if self._last_dictation is None:
+            self._tray.showMessage("Bepo", "Nothing to undo.", QSystemTrayIcon.MessageIcon.Information, 3000)
+            return
+        count, window = self._last_dictation
+        if not self._same_window(window):
+            self._tray.showMessage(
+                "Bepo", "Switch back to the window you dictated into, then undo again.",
+                QSystemTrayIcon.MessageIcon.Warning, 5000,
+            )
+            return
+        self._last_dictation = None
+        enqueue_deletion(count, "")
+        _play_earcon("delete")
+
+    def _rebuild_history_menu(self):
+        menu = self._history_menu
+        menu.clear()
+        if not self._history:
+            menu.addAction("(nothing yet)").setEnabled(False)
+            return
+        for text in self._history:
+            label = " ".join(text.split())
+            label = label if len(label) <= 48 else label[:47] + "…"
+            action = menu.addAction(label.replace("&", "&&"))
+            action.triggered.connect(lambda _checked=False, t=text: self._copy_to_clipboard(t))
+
+    def _copy_to_clipboard(self, text: str):
+        QApplication.clipboard().setText(text)
 
     @Slot(str)
     def _on_transcriber_error(self, msg: str):
@@ -556,6 +659,8 @@ class BepoApp(QObject):
         self._hotkey.stop_esc_watcher()
         self._update_tray_state(recording=False)
         self._pill.show_error(msg)
+        if msg == "No speech detected":
+            self._note_no_speech()
         self._schedule_trim()
 
     # ------------------------------------------------------------------ #
@@ -668,6 +773,14 @@ class BepoApp(QObject):
         )
         self._dictate_action.triggered.connect(self._toggle_recording)
         menu.addAction(self._dictate_action)
+
+        undo_action = QAction("↶  Undo last dictation", self._app)
+        undo_action.triggered.connect(self.undo_last_dictation)
+        menu.addAction(undo_action)
+
+        self._history_menu = menu.addMenu("🕘  Recent dictations")
+        self._history_menu.aboutToShow.connect(self._rebuild_history_menu)
+        self._history_menu.menuAction().setVisible(self._keep_history)
 
         settings_action = QAction("⚙️  Settings", self._app)
         settings_action.triggered.connect(self._show_settings)

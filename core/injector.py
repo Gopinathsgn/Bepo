@@ -104,6 +104,14 @@ class INPUT(ctypes.Structure):
     ]
 
 
+def foreground_window() -> int:
+    """Handle of the window that currently has keyboard focus (0 if unknown)."""
+    try:
+        return int(ctypes.windll.user32.GetForegroundWindow() or 0)
+    except Exception:
+        return 0
+
+
 def _send_unicode_string(text: str) -> bool:
     """Send text via SendInput KEYEVENTF_UNICODE events with UTF-16 surrogate pair support."""
     user32 = ctypes.windll.user32

@@ -334,6 +334,12 @@ class SettingsDialog(QDialog):
         lay.addWidget(self.fillers_check)
         self.emoji_check = QCheckBox('Turn spoken emoji into symbols ("thumbs up emoji" → 👍)')
         lay.addWidget(self.emoji_check)
+        self.smart_check = QCheckBox('Spoken punctuation, numbers and addresses')
+        lay.addWidget(self.smart_check)
+        self.smart_hint = self._hint(
+            '"comma", "question mark" → , ?    "twenty five" → 25    "fifty percent" → 50%    '
+            '"jane at gmail dot com" → jane@gmail.com. Single small numbers (one to ten) stay words.')
+        lay.addWidget(self.smart_hint)
         self.formatting_check = QCheckBox('Spoken line breaks and lists ("new line", "numbered list")')
         lay.addWidget(self.formatting_check)
         self.line_break_combo = QComboBox()
@@ -367,6 +373,8 @@ class SettingsDialog(QDialog):
         self.speed_combo.addItem("Efficient — less CPU, text appears ≈0.2 s later", "efficient")
         self.speed_combo.addItem("Fast — quickest typing, uses more CPU", "fast")
         lay.addLayout(self._labeled("Responsiveness", self.speed_combo))
+        lay.addWidget(self._hint(
+            "Tip: if text feels slow to appear, choose Fast. Efficient is gentler on battery and CPU."))
         self.mic_combo = QComboBox()
         self.mic_refresh = QPushButton("↻")
         self.mic_refresh.setToolTip("Refresh the list of microphones")
@@ -383,6 +391,12 @@ class SettingsDialog(QDialog):
         lay.addWidget(self._hint(
             "Names, product names and jargon Bepo should prefer. Write them the way you want "
             "them typed. This nudges recognition; it can't guarantee a result."))
+        self.strength_combo = QComboBox()
+        self.strength_combo.addItem("Normal", "normal")
+        self.strength_combo.addItem("Strong — try this if names are still missed", "strong")
+        self.strength_combo.addItem("Stronger — may produce your words by mistake", "stronger")
+        lay.addLayout(self._labeled("Custom word emphasis", self.strength_combo))
+        lay.addWidget(self._hint("Changing this reloads the speech model for a moment."))
         col.addWidget(card)
 
         # ---- System & privacy
@@ -391,6 +405,11 @@ class SettingsDialog(QDialog):
         lay.addWidget(self.startup_check)
         self.clipboard_check = QCheckBox("Also keep the dictated text on the clipboard")
         lay.addWidget(self.clipboard_check)
+        self.history_check = QCheckBox("Remember my last 10 dictations (tray menu, in memory only)")
+        lay.addWidget(self.history_check)
+        lay.addWidget(self._hint(
+            "Lets you recover text that landed in the wrong window. Never written to disk or logs; "
+            "forgotten when Bepo quits or this is turned off. Picking an entry copies it to the clipboard.", "warn"))
         lay.addWidget(self._hint(
             "Off by default so Bepo never touches your clipboard. When on, Windows clipboard "
             "history (Win+V) and cloud clipboard sync may store what you dictate.", "warn"))
@@ -482,6 +501,7 @@ class SettingsDialog(QDialog):
         self.continuous_check.setChecked(cfg["continuous_mode"])
         self.fillers_check.setChecked(cfg["filter_filler_words"])
         self.emoji_check.setChecked(cfg["enable_emojis"])
+        self.smart_check.setChecked(cfg["smart_formatting"])
         self.formatting_check.setChecked(cfg["voice_formatting"])
         self.line_break_combo.setCurrentIndex(self.line_break_combo.findData(cfg["line_break_key"]))
         self.autostop_check.setChecked(cfg["auto_stop_on_pause"])
@@ -493,6 +513,8 @@ class SettingsDialog(QDialog):
                                 lambda v: "1 minute of silence" if v == 1 else f"{v} minutes of silence")
         self.model_combo.setCurrentIndex(self.model_combo.findData(cfg["speech_model"]))
         self.speed_combo.setCurrentIndex(self.speed_combo.findData(cfg["responsiveness"]))
+        self.strength_combo.setCurrentIndex(self.strength_combo.findData(cfg["custom_word_strength"]))
+        self.history_check.setChecked(cfg["keep_history"])
         self._fill_microphones(cfg["microphone"])
         self.vocab_edit.setPlainText("\n".join(cfg["custom_vocabulary"]))
         self.startup_check.setChecked(launch_at_startup)
@@ -533,6 +555,7 @@ class SettingsDialog(QDialog):
         cfg["filter_filler_words"] = self.fillers_check.isChecked()
         cfg["enable_emojis"] = self.emoji_check.isChecked()
         cfg["voice_formatting"] = self.formatting_check.isChecked()
+        cfg["smart_formatting"] = self.smart_check.isChecked()
         cfg["line_break_key"] = self.line_break_combo.currentData()
         cfg["auto_stop_on_pause"] = self.autostop_check.isChecked()
         cfg["pause_duration_seconds"] = self.pause_combo.currentData()
@@ -541,6 +564,8 @@ class SettingsDialog(QDialog):
             cfg["safety_idle_timeout_seconds"] = float(minutes * 60)
         cfg["speech_model"] = self.model_combo.currentData()
         cfg["responsiveness"] = self.speed_combo.currentData()
+        cfg["custom_word_strength"] = self.strength_combo.currentData()
+        cfg["keep_history"] = self.history_check.isChecked()
         cfg["microphone"] = self._selected_microphone()
         cfg["custom_vocabulary"] = app_config.clean_vocabulary(self.vocab_edit.toPlainText())
         cfg["clipboard_safety_net"] = self.clipboard_check.isChecked()

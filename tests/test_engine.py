@@ -151,6 +151,50 @@ class ModelLoadingTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 engine.load_transcriber("medium")
 
+    def test_custom_word_strength_is_passed_to_the_model_only_when_set(self):
+        import sys
+        import types
+        created = []
+
+        class FakeTranscriber:
+            def __init__(self, path, arch, options=None):
+                created.append(options)
+
+            def set_keyterms(self, terms):
+                pass
+
+            def transcribe_without_streaming(self, *args):
+                pass
+
+        fake = types.SimpleNamespace(Transcriber=FakeTranscriber)
+        with mock.patch.dict(sys.modules, {"moonshine_voice": fake}), \
+                mock.patch.object(engine.model_downloader, "find_installed_model", return_value="x"), \
+                mock.patch.object(engine.model_downloader, "model_arch", return_value="arch"):
+            engine.load_transcriber("small")
+            engine.load_transcriber("small", ["Bepo"], 2.0)
+        self.assertEqual(created, [None, {"keyterm_boost": 2.0}])
+        self.assertIsNone(engine.EngineSettings.from_config(config.normalize({})).keyterm_boost)
+        strong = config.normalize({"custom_word_strength": "strong"})
+        self.assertEqual(engine.EngineSettings.from_config(strong).keyterm_boost, 2.0)
+
+    def test_level_meter_reports_loudness_and_passes_audio_through(self):
+        import queue
+        import numpy as np
+
+        class Session:
+            _audio_queue = queue.Queue()
+
+        levels = []
+        session = Session()
+        self.assertTrue(engine.attach_level_meter(session, levels.append))
+        loud = np.full(1024, 0.2, dtype=np.float32)
+        session._audio_queue.put((loud, 16000))
+        session._audio_queue.put((np.zeros(1024, dtype=np.float32), 16000))
+        self.assertAlmostEqual(levels[0], 1.0)
+        self.assertEqual(levels[1], 0.0)
+        self.assertEqual(session._audio_queue.qsize(), 2)       # the audio still reaches the engine
+        self.assertFalse(engine.attach_level_meter(object(), levels.append))   # unknown session: no-op
+
     def test_vocabulary_is_applied_and_failures_are_reported_not_raised(self):
         model = FakeModel()
         self.assertTrue(engine.apply_vocabulary(model, ["Kubernetes"]))

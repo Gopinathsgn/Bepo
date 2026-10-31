@@ -73,6 +73,7 @@ Unlike traditional cloud voice assistants, Bepo runs **Moonshine AI's quantized 
 | ⌫ **Voice Deletion Commands** | Speak commands like *"Scratch that"*, *"Delete last word"*, or *"Clear all"* to instantly erase typed words. |
 | 🎙️ **Dual Input Modes** | **Toggle Mode** (`Ctrl + Win`) for hands-free streaming and **Push-to-Talk** (`Ctrl + Space`) for quick replies. |
 | 🧹 **Filler Word Filter** | Automatically scrubs vocal hesitations (`um`, `uh`, `erm`, `er`, `ah`, `hmm`) for clean, professional transcripts. |
+| 🔢 **Smart Formatting** | *"comma"*, *"question mark"*, *"open quote"* become punctuation; *"twenty five"* → 25, *"fifty percent"* → 50%, *"jane at gmail dot com"* → jane@gmail.com. Small numbers (one–ten) stay words. Turn it off in Settings. |
 | 📝 **Line Breaks & Lists** | Say *"new line"*, or *"numbered list"* / *"bullet list"* then *"next item"* and *"end list"* to lay out lists by voice. |
 | 😊 **Spoken Emoji Dictation** | Speak emojis naturally (*"fire emoji"* → 🔥, *"thumbs up emoji"* → 👍, *"rocket emoji"* → 🚀) with zero false positives. |
 | 🪟 **Floating Glass Overlay** | Minimalist always-on-top pill with a dark translucent glass look, soft shadow, and smooth slide animations. It never steals focus. |
@@ -370,13 +371,16 @@ The Settings window edits this JSON file for you; you can also edit it by hand (
   "continuous_mode": true,
   "filter_filler_words": true,
   "enable_emojis": true,
+  "smart_formatting": true,
   "safety_idle_timeout_seconds": 180.0,
   "auto_stop_on_pause": false,
   "pause_duration_seconds": 2.0,
   "esc_to_finish": true,
   "clipboard_safety_net": false,
+  "keep_history": false,
   "speech_model": "small",
   "responsiveness": "efficient",
+  "custom_word_strength": "normal",
   "microphone": null,
   "custom_vocabulary": []
 }
@@ -384,11 +388,14 @@ The Settings window edits this JSON file for you; you can also edit it by hand (
 
 - `"hotkey_toggle"` / `"hotkey_ptt"`: modifiers (`ctrl`, `alt`, `shift`, `win`) joined with `+`, then a key (`a`–`z`, `0`–`9`, `f1`–`f24`, `space`, `enter`, `tab`, or `win`) — e.g. `"ctrl+alt+d"`, `"f9"`. `""` disables one. Invalid values fall back to the default and show a tray warning.
 - `"continuous_mode"`, `"filter_filler_words"`, `"enable_emojis"`, `"esc_to_finish"`: on/off switches for the matching Settings options.
+- `"smart_formatting"`: spoken punctuation (*"comma"*, *"question mark"*, *"period"* at the end of a phrase), numbers (*"twenty five"* → 25, *"three point five percent"* → 3.5%) and addresses (*"name at gmail dot com"*).
 - `"safety_idle_timeout_seconds"`: silence after which the microphone is released (default 180 s).
 - `"auto_stop_on_pause"` / `"pause_duration_seconds"`: with continuous mode off, finish automatically after a pause.
 - `"clipboard_safety_net"`: also keep the whole dictated session on the clipboard (off by default — see [Tips](#-tips-for-pro-users)).
+- `"keep_history"`: remember the last 10 dictations in memory only (never written to disk or logs) for the tray's *Recent dictations* menu; picking one copies it to the clipboard. Off by default.
 - `"speech_model"`: `"tiny"`, `"small"` or `"medium"`.
 - `"responsiveness"`: `"efficient"` (live transcript refreshes every 1.0 s, about a third less CPU) or `"fast"` (every 0.5 s).
+- `"custom_word_strength"`: `"normal"`, `"strong"` or `"stronger"` — how firmly your custom words are favoured (changing it reloads the speech model). The stronger levels are untuned: use them only if names are still missed.
 - `"microphone"`: the exact device name, or `null` for the Windows default.
 - `"custom_vocabulary"`: list of words/phrases to bias recognition towards.
 
@@ -436,6 +443,8 @@ ISCC.exe installer.iss
 This outputs `dist\Bepo-Setup-v<version>.exe` (the version comes from [`version.py`](version.py) in CI; pass `/DMyAppVersion=x.y.z` to override it locally) ready for distribution.
 
 Releases are built automatically by GitHub Actions when you push a tag such as `v1.1.1` (the tag must match `version.py`).
+
+Release assets also include a `SHA256SUMS.txt` so you can verify your download.
 
 ---
 

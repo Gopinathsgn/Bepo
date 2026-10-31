@@ -26,6 +26,7 @@ class FakeTranscriber(QObject):
     error = Signal(str)
     ready = Signal()
     loading = Signal()
+    level = Signal(float)
 
     def __init__(self, parent=None, settings=None, preload=None):
         super().__init__(parent)
@@ -108,6 +109,7 @@ class SessionFlowTests(unittest.TestCase):
         self.main = main
         self.injections, self.deletions, self.earcons = [], [], []
         self.injector_config = []
+        self.window = 100                       # the "focused window" seen by the controller
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.user_cfg = Path(self._tmp.name) / "config.json"
@@ -121,6 +123,7 @@ class SessionFlowTests(unittest.TestCase):
                               lambda text, session=None: self.injections.append(text)),
             mock.patch.object(main, "enqueue_deletion",
                               lambda count, session=None: self.deletions.append(count)),
+            mock.patch.object(main, "foreground_window", lambda: self.window),
             mock.patch.object(main, "configure_injector",
                               lambda **kw: self.injector_config.append(kw)),
             mock.patch.object(main.app_config, "USER_CONFIG_PATH", self.user_cfg),
@@ -435,6 +438,108 @@ class SessionFlowTests(unittest.TestCase):
         self.assertEqual(self.ctrl._hotkey.calls, ["suspend", "resume"])
 
 
+    # smart formatting, window guard, undo, history, microphone hint ------
+    def test_smart_formatting_types_punctuation_and_numbers(self):
+        self.start()
+        self.say("Meet me at twenty five dollars question mark")
+        self.assertEqual(self.injections, ["Meet me at $25?"])
+
+    def test_smart_formatting_can_be_turned_off(self):
+        self.ctrl.apply_settings(dict(self.ctrl._config, smart_formatting=False))
+        self.start()
+        self.say("twenty five apples")
+        self.assertEqual(self.injections, ["Twenty five apples"])
+
+    def test_voice_deletion_is_skipped_when_focus_moved_to_another_window(self):
+        self.start()
+        self.say("Hello world.")
+        self.window = 200
+        self.say("Scratch that.")
+        self.assertEqual(self.deletions, [])
+        self.assertIn("window changed", str(self.pill.calls[-1]).lower())
+        self.window = 100
+        self.say("Scratch that.")
+        self.assertEqual(self.deletions, [len("Hello world.")])
+
+    def test_undo_last_dictation_removes_what_was_typed(self):
+        self.start()
+        self.say("Hello world.")
+        self.say("Second one.")
+        self.stop("Hello world. Second one.")
+        self.ctrl.undo_last_dictation()
+        self.assertEqual(self.deletions, [len("Hello world. Second one.")])
+        self.ctrl.undo_last_dictation()                 # nothing left to undo
+        self.assertEqual(len(self.deletions), 1)
+
+    def test_undo_waits_for_the_original_window(self):
+        self.start(mode="ptt")
+        self.stop("hello there")
+        self.window = 300
+        with mock.patch.object(self.ctrl._tray, "showMessage") as message:
+            self.ctrl.undo_last_dictation()
+        self.assertEqual(self.deletions, [])
+        message.assert_called_once()
+        self.window = 100
+        self.ctrl.undo_last_dictation()
+        self.assertEqual(self.deletions, [len("Hello there")])
+
+    def test_undo_is_ignored_while_recording(self):
+        self.start()
+        self.say("Hello.")
+        self.stop("Hello.")
+        self.start()
+        self.ctrl.undo_last_dictation()
+        self.assertEqual(self.deletions, [])
+
+    def test_history_is_off_by_default_and_kept_in_memory_when_enabled(self):
+        self.start()
+        self.say("Hello world.")
+        self.stop("Hello world.")
+        self.assertEqual(list(self.ctrl._history), [])
+        self.ctrl.apply_settings(dict(self.ctrl._config, keep_history=True))
+        self.start()
+        self.say("Remember me.")
+        self.stop("Remember me.")
+        self.assertEqual(list(self.ctrl._history), ["Remember me."])
+        self.ctrl.apply_settings(dict(self.ctrl._config, keep_history=False))
+        self.assertEqual(list(self.ctrl._history), [])
+
+    def test_history_menu_lists_entries_and_copies_on_click(self):
+        self.ctrl.apply_settings(dict(self.ctrl._config, keep_history=True))
+        self.start(mode="ptt")
+        self.stop("copy this")
+        menu = self.ctrl._history_menu
+        self.ctrl._rebuild_history_menu()
+        actions = menu.actions()
+        self.assertEqual([a.text() for a in actions], ["Copy this"])
+        actions[0].trigger()
+        self.assertEqual(_app.clipboard().text(), "Copy this")
+
+    def test_repeated_empty_dictations_suggest_checking_the_microphone(self):
+        with mock.patch.object(self.ctrl._tray, "showMessage") as message:
+            for _ in range(self.main.NO_SPEECH_HINT_AFTER):
+                self.start()
+                self.stop("")
+        message.assert_called_once()
+        self.assertIn("Microphone in use", message.call_args.args[1])
+
+    def test_speech_resets_the_microphone_hint_counter(self):
+        with mock.patch.object(self.ctrl._tray, "showMessage") as message:
+            self.start()
+            self.stop("")
+            self.start()
+            self.say("Hello.")
+            self.stop("Hello.")
+            self.start()
+            self.stop("")
+        message.assert_not_called()
+
+    def test_microphone_level_reaches_the_pill(self):
+        self.ctrl._transcriber.level.emit(0.5)
+        _app.processEvents()
+        self.assertIn(("set_level", (0.5,)), self.pill.calls)
+
+
 class BootstrapTests(unittest.TestCase):
     def test_single_instance_lock(self):
         from core import bootstrap
@@ -455,7 +560,7 @@ class BootstrapTests(unittest.TestCase):
                 mock.patch.object(engine, "load_transcriber", return_value="MODEL") as load:
             preload = bootstrap.start_preload(config.normalize({"speech_model": "tiny"}))
             self.assertEqual(preload.take(), "MODEL")
-            load.assert_called_once_with("tiny", ())
+            load.assert_called_once_with("tiny", (), None)
 
 
 if __name__ == "__main__":

@@ -30,5 +30,36 @@ class WaveformTests(unittest.TestCase):
         self.assertFalse(w._timer.isActive())
 
 
+class WaveformMeterTests(unittest.TestCase):
+    def test_bars_follow_the_real_level_before_speech_is_recognised(self):
+        w = WaveformWidget()
+        self.addCleanup(w.deleteLater)
+        w.set_meter(True)                       # listening, not yet streaming
+        w.set_level(0.0)
+        for _ in range(12):
+            w._tick()
+        self.assertEqual(w._heights, [IDLE_HEIGHT] * len(w._heights))     # silence stays flat
+        w.set_level(0.9)
+        for _ in range(12):
+            w._tick()
+        self.assertTrue(any(h > IDLE_HEIGHT + 6 for h in w._heights))
+
+    def test_falls_back_to_idle_when_levels_stop_arriving(self):
+        w = WaveformWidget()
+        self.addCleanup(w.deleteLater)
+        w.set_meter(True)
+        w.set_level(0.9)
+        for _ in range(80):
+            w._tick()
+        self.assertEqual(w._heights, [IDLE_HEIGHT] * len(w._heights))
+        self.assertFalse(w._timer.isActive())
+
+    def test_meter_off_ignores_levels_without_speech(self):
+        w = WaveformWidget()
+        self.addCleanup(w.deleteLater)
+        w.set_level(0.9)
+        self.assertFalse(w._timer.isActive())
+
+
 if __name__ == "__main__":
     unittest.main()

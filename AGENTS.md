@@ -67,6 +67,7 @@ graph TD
 | [`main.py`](main.py) | Application Lifecycle & Hub | `BepoApp`, `main()`, `_make_tray_icon` | Coordinates all sub-components, connects all Qt signals, applies settings live (`apply_settings`), schedules the idle memory trim. **Import order matters:** `bootstrap.early_start()` runs before the PySide6 imports (see §8). |
 | [`core/transcriber.py`](core/transcriber.py) | Dictation Sessions | `TranscriberThread` | Qt-facing wrapper: loads/reloads the model on a background thread, opens and **closes** a microphone session per dictation, applies settings at runtime. Emits `ready`, `loading`, `partial_text`, `segment_text`, `final_text`, `error`. Call `start_loading()` only after connecting signals. |
 | [`core/engine.py`](core/engine.py) | Speech Engine (no Qt) | `EngineSettings`, `load_transcriber()`, `open_session()`, `Preloader` | All Moonshine specifics: model loading, per-dictation `MicTranscriber` on a shared model, key terms, early preload thread. |
+| [`core/smartformat.py`](core/smartformat.py) | Spoken Punctuation & Numbers (no Qt) | `smart_format()`, `normalize_numbers()` | Conservative rewrites of spoken punctuation, numbers, percent/dollars and e-mail/domains. Called from `clean_transcript(smart_formatting=...)`, gated by `smart_formatting`. Anything ambiguous ("one", "the period was long") must be left alone. |
 | [`core/formatting.py`](core/formatting.py) | Spoken Layout (no Qt) | `parse_format_command()`, `ListState` | Whole-utterance "new line / numbered list / next item / end list" commands and the list state machine (`compose()` decides marker, line break or space). Gated by `voice_formatting`. |
 | [`core/config.py`](core/config.py) | Settings (no Qt) | `DEFAULT_CONFIG`, `normalize()`, `load_config()`, `save_user_config()` | Single source of truth for settings: defaults, validation, merging bundled + user config, saving only non-default values. |
 | [`core/bootstrap.py`](core/bootstrap.py) | Early Start-up (no Qt) | `early_start()` | Logging, single-instance mutex, model preload — run before Qt is imported so the model loads in parallel with the UI. |
@@ -175,6 +176,7 @@ stateDiagram-v2
 ### 6. Privacy Contract (public promises in the README)
 - **Clipboard:** never read or written by default. The paste fallback must restore the previous clipboard; `clipboard_safety_net` is opt-in.
 - **Logs:** never include dictated text — log character counts only.
+- **History:** the opt-in `keep_history` list lives in memory only (never disk, never logs) and touches the clipboard only when the user clicks an entry.
 - **Network:** only the one-time model download; nothing during dictation.
 - **Hotkeys:** `RegisterHotKey` plus `GetAsyncKeyState` polling of Esc/PTT keys only. No global keyboard hooks.
 

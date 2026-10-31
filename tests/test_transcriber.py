@@ -86,7 +86,7 @@ class Harness:
         self.gate = threading.Event()          # clear() it to hold model loads open
         self.gate.set()
 
-        def load(model_key, vocabulary=()):
+        def load(model_key, vocabulary=(), keyterm_boost=None):
             self.gate.wait(3)
             self.loaded_models.append(model_key)
             model = FakeModel(model_key)
@@ -327,7 +327,7 @@ class ApplySettingsTests(unittest.TestCase):
         gate = threading.Event()
         loaded: list[FakeModel] = []
 
-        def slow_load(model_key, vocabulary=()):
+        def slow_load(model_key, vocabulary=(), keyterm_boost=None):
             if model_key == "medium":
                 gate.wait(2)
             model = FakeModel(model_key)

@@ -29,6 +29,16 @@ class NormalizeTests(unittest.TestCase):
         self.assertEqual(config.normalize({"line_break_key": "tab"})["line_break_key"], "shift_enter")
         self.assertFalse(config.normalize({"voice_formatting": False})["voice_formatting"])
 
+    def test_accuracy_and_ux_settings(self):
+        cfg = config.normalize({})
+        self.assertTrue(cfg["smart_formatting"])
+        self.assertFalse(cfg["keep_history"])
+        self.assertEqual(cfg["custom_word_strength"], "normal")
+        self.assertEqual(config.normalize({"custom_word_strength": "strong"})["custom_word_strength"], "strong")
+        self.assertEqual(config.normalize({"custom_word_strength": "loud"})["custom_word_strength"], "normal")
+        self.assertFalse(config.normalize({"smart_formatting": False})["smart_formatting"])
+        self.assertTrue(config.normalize({"keep_history": True})["keep_history"])
+
     def test_bad_values_fall_back_to_defaults(self):
         cfg = config.normalize({
             "continuous_mode": "maybe", "safety_idle_timeout_seconds": "soon",

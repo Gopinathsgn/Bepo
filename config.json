@@ -5,6 +5,7 @@
   "filter_filler_words": true,
   "enable_emojis": true,
   "voice_formatting": true,
+  "smart_formatting": true,
   "line_break_key": "shift_enter",
   "safety_idle_timeout_seconds": 180.0,
   "auto_stop_on_pause": false,

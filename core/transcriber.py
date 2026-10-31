@@ -30,6 +30,7 @@ class TranscriberThread(QObject):
         error(str)         — error message (no speech, mic failure, etc.)
         ready()            — emitted when the model is loaded and ready
         loading()          — emitted when a (re)load of the model starts
+        level(float)       — microphone loudness (0..1) while listening
     """
 
     partial_text = Signal(str)
@@ -38,6 +39,7 @@ class TranscriberThread(QObject):
     error        = Signal(str)
     ready        = Signal()
     loading      = Signal()
+    level        = Signal(float)   # microphone loudness 0..1 while listening
 
     def __init__(self, parent=None, settings: EngineSettings | None = None, preload=None):
         super().__init__(parent)
@@ -83,11 +85,12 @@ class TranscriberThread(QObject):
 
     def _load_engine(self, generation: int, settings: EngineSettings, preload):
         try:
-            if preload is not None and preload.settings.model == settings.model:
+            if (preload is not None and preload.settings.model == settings.model
+                    and preload.settings.keyterm_boost == settings.keyterm_boost):
                 loaded = preload.take()
                 engine.apply_vocabulary(loaded, settings.vocabulary)
             else:
-                loaded = engine.load_transcriber(settings.model, settings.vocabulary)
+                loaded = engine.load_transcriber(settings.model, settings.vocabulary, settings.keyterm_boost)
         except Exception as exc:
             logging.error("[Transcriber] Error loading model: %s", exc)
             if generation == self._load_generation:
@@ -131,7 +134,7 @@ class TranscriberThread(QObject):
     def apply_settings(self, settings: EngineSettings):
         """Re-apply settings at runtime (see module docstring for what takes effect when)."""
         previous, self._settings = self._settings, settings
-        if settings.model != previous.model:
+        if settings.model != previous.model or settings.keyterm_boost != previous.keyterm_boost:
             if self._recording or self._stopping:
                 self._reload_pending = True          # reload as soon as this dictation ends
             else:
@@ -166,6 +169,7 @@ class TranscriberThread(QObject):
             self._session = engine.open_session(
                 self._engine, self._settings, self._on_partial, self._on_line, self._on_error
             )
+            engine.attach_level_meter(self._session, self._on_level)
             self._session.start()
             logging.info("[Transcriber] Microphone listening started")
         except Exception as exc:
@@ -282,6 +286,10 @@ class TranscriberThread(QObject):
             self._current_partial = ""
         if self._recording:
             self.segment_text.emit(text)
+
+    def _on_level(self, level: float):
+        if self._recording:
+            self.level.emit(level)
 
     def _on_error(self, exc: BaseException):
         # The session is broken (e.g. microphone unplugged): end it and release the microphone.

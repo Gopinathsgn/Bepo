@@ -240,6 +240,10 @@ class PillWindow(QWidget):
             self._apply_dwm()
             self._dwm_applied = True
 
+    def set_level(self, level: float):
+        """Microphone loudness 0..1: the waveform shows whether Bepo is hearing you."""
+        self._waveform.set_level(level)
+
     def update_partial(self, text: str):
         if self._state in (PillState.LISTENING, PillState.STREAMING):
             self._set_state(PillState.STREAMING)
@@ -297,6 +301,7 @@ class PillWindow(QWidget):
         name = state.name.lower()
         self._dot.set_state(name)
         self._waveform.set_active(state == PillState.STREAMING)
+        self._waveform.set_meter(state in (PillState.LISTENING, PillState.STREAMING))
 
         labels = {
             PillState.LISTENING: "Listening",

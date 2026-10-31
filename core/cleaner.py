@@ -11,6 +11,7 @@ Features:
 
 import re
 from core.emoji import parse_emojis
+from core.smartformat import smart_format
 
 # Non-lexical conversational fillers in English (hesitation disfluencies)
 FILLER_WORDS_PATTERN = r'\b(?:um+|uh+|erm|er+|ah+|hmm+|mm+)\b'
@@ -19,12 +20,14 @@ FILLER_WORDS_PATTERN = r'\b(?:um+|uh+|erm|er+|ah+|hmm+|mm+)\b'
 def clean_transcript(
     text: str,
     filter_fillers: bool = True,
-    enable_emojis: bool = True
+    enable_emojis: bool = True,
+    smart_formatting: bool = False,
 ) -> str:
     """
     Cleans transcribed text:
     - Strips non-lexical filler words if filter_fillers is True
     - Converts spoken emoji descriptions to Unicode characters if enable_emojis is True
+    - Turns spoken punctuation, numbers and web addresses into symbols if smart_formatting is True
     - Normalizes punctuation and dangling commas
     - Fixes sentence capitalization
     - Collapses duplicate whitespace
@@ -72,6 +75,11 @@ def clean_transcript(
     # If only whitespace and punctuation remains (e.g. '...' or ','), return empty string
     if not re.sub(r'[\s.,:;!?\'"—–-]+', '', cleaned):
         return ""
+
+    if smart_formatting:
+        cleaned = smart_format(cleaned)
+        if not cleaned:
+            return ""
 
     # 7. Sentence capitalization (leave words that already have an internal capital alone:
     #    "iPhone", "eBay", "macOS" must not become "IPhone", "EBay", "MacOS")
