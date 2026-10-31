@@ -167,7 +167,10 @@ class ModelLoadingTests(unittest.TestCase):
                 pass
 
         fake = types.SimpleNamespace(Transcriber=FakeTranscriber)
+        # _prewarm imports numpy; if that first import happened inside patch.dict, numpy would be dropped from
+        # sys.modules on exit and any later import of it fails ("cannot load module more than once per process")
         with mock.patch.dict(sys.modules, {"moonshine_voice": fake}), \
+                mock.patch.object(engine, "_prewarm"), \
                 mock.patch.object(engine.model_downloader, "find_installed_model", return_value="x"), \
                 mock.patch.object(engine.model_downloader, "model_arch", return_value="arch"):
             engine.load_transcriber("small")
