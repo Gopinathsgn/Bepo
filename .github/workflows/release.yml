@@ -105,6 +105,12 @@ jobs:
           & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" "/DMyAppVersion=$version" installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Write SHA-256 checksums
+        run: |
+          Get-FileHash dist\Bepo-Setup-*.exe, dist\Bepo-Windows-Portable.zip -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
+            Set-Content dist\SHA256SUMS.txt -Encoding ascii
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -112,6 +118,7 @@ jobs:
           path: |
             dist/Bepo-Setup-*.exe
             dist/Bepo-Windows-Portable.zip
+            dist/SHA256SUMS.txt
           if-no-files-found: error
 
       - name: Publish Release Assets to GitHub Release
@@ -121,5 +128,6 @@ jobs:
           files: |
             dist/Bepo-Setup-*.exe
             dist/Bepo-Windows-Portable.zip
+            dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
