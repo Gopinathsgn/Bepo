@@ -73,7 +73,8 @@ graph TD
 | [`core/config.py`](core/config.py) | Settings (no Qt) | `DEFAULT_CONFIG`, `normalize()`, `load_config()`, `save_user_config()` | Single source of truth for settings: defaults, validation, merging bundled + user config, saving only non-default values. |
 | [`core/bootstrap.py`](core/bootstrap.py) | Early Start-up (no Qt) | `early_start()` | Logging, single-instance mutex, model preload — run before Qt is imported so the model loads in parallel with the UI. |
 | [`core/audio_devices.py`](core/audio_devices.py) | Microphone List | `list_input_devices()`, `resolve_device()` | Input devices of the default host API; saved device name -> index (falls back to the system default if unplugged). |
-| [`core/startup.py`](core/startup.py) | Start With Windows | `set_enabled()`, `is_enabled()` | HKCU Run-key entry; repaired at launch if the install moved (frozen builds only). |
+| [`core/startup.py`](core/startup.py) | Start With Windows | `set_enabled()`, `is_enabled()`, `is_packaged()` | HKCU Run-key entry (repaired at launch if the install moved); inside an MSIX package it uses the manifest's `BepoStartup` StartupTask via `winrt` instead (see §11). |
+| [`packaging/msix/`](packaging/msix) | Microsoft Store Package | `build_msix.ps1`, `AppxManifest.xml.in`, `make_assets.py` | Packs `dist\Bepo` into an unsigned `.msix` (Partner Center signs it). Identity comes from the `MSIX_*` repository variables; `release.yml` skips the step until they exist. |
 | [`core/memory.py`](core/memory.py) | Idle Memory | `trim_working_set()` | `EmptyWorkingSet` after 15 s idle: frees physical RAM without unloading the model. |
 | [`core/hotkey.py`](core/hotkey.py) | Global Shortcuts | `HotkeyManager`, `parse_hotkey()` | Dispatches the toggle (default `Ctrl+Win`), Push-to-Talk (default `Ctrl+Space`) and Undo-last-dictation (default `Alt+Win+Z`) shortcuts, all configurable. The undo default must not start with the toggle combination: `Ctrl+Win` fires as soon as both keys are down, so `Ctrl+Win+Z` would start dictation first. Emits thread-safe Qt signals, and `registration_issue` when a shortcut can't be registered. |
 | [`core/injector.py`](core/injector.py) | Active Cursor Injection | `enqueue_injection()`, `inject_text()`, `configure()` | Injects text via Win32 `SendInput` with UTF-16 surrogate support, on one sequential worker thread. Falls back to clipboard paste and restores the previous clipboard. Never touches the clipboard otherwise (unless the opt-in `clipboard_safety_net` is on). |
@@ -201,6 +202,12 @@ stateDiagram-v2
 ### 10. Text Must Never Be Cropped
 - Don't give windows that show text a hard-coded height. `SetupScreen` sizes itself from its content (`_fit_to_content()`, called after every state change) and every message label is word-wrapped.
 - Anything that can contain arbitrary text (exceptions, URLs, file paths) must go through `ui.setup_screen.breakable()` before it is shown in a wrapped label. Qt only wraps at spaces, so one long unbroken token otherwise makes the label wider than the window and it gets cropped. `tests/test_setup_screen.py` checks every state, including worst-case errors.
+
+### 11. Microsoft Store (MSIX) Build
+- The same PyInstaller output feeds the installer, the zip and the MSIX; the package only adds `AppxManifest.xml` and images (`packaging/msix/`). Keep `runFullTrust` and the `microphone` capability in the manifest template, and keep `TaskId="BepoStartup"` equal to `startup.STARTUP_TASK_ID`.
+- Inside a package, registry and `%LOCALAPPDATA%` writes are virtualised: never rely on the Run key (use `startup.is_packaged()`), and never assume a path outside the app folder is shared with an unpackaged install.
+- `winrt` calls run on a throw-away thread (`startup._run_in_thread`), never on the Qt thread. Keep those imports lazy so unpackaged runs don't need them.
+- The package version is `X.Y.Z.0` (the Store owns the last part); the Partner Center identity is never committed, only passed through variables.
 
 ---
 

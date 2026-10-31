@@ -40,6 +40,9 @@ class StartupEntryTests(unittest.TestCase):
         self.assertFalse(startup.is_enabled())
         self.assertTrue(startup.set_enabled(False))          # disabling twice is fine
 
+    def test_source_and_exe_installs_are_not_packaged(self):
+        self.assertFalse(startup.is_packaged())
+
     def test_command_is_quoted_and_points_at_this_install(self):
         command = startup.startup_command()
         self.assertTrue(command.startswith('"'))
@@ -57,6 +60,49 @@ class StartupEntryTests(unittest.TestCase):
         with mock.patch.object(startup, "startup_command", return_value='"C:\\New\\Bepo.exe"'):
             startup.refresh_if_enabled()
             self.assertEqual(startup._read_value(), '"C:\\New\\Bepo.exe"')
+
+
+class PackagedStartupTests(unittest.TestCase):
+    """Microsoft Store (MSIX) installs use the package's StartupTask, never the Run key."""
+
+    def setUp(self):
+        p = mock.patch.object(startup, "is_packaged", return_value=True)
+        p.start()
+        self.addCleanup(p.stop)
+        # the Run key must stay untouched: any access fails the test
+        for name in ("_read_value", "_set_run_key"):
+            p = mock.patch.object(startup, name, side_effect=AssertionError("Run key used in a package"))
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_state_comes_from_the_startup_task(self):
+        with mock.patch.object(startup, "_startup_task_enabled", return_value=True):
+            self.assertTrue(startup.is_enabled())
+        with mock.patch.object(startup, "_startup_task_enabled", return_value=False):
+            self.assertFalse(startup.is_enabled())
+
+    def test_set_enabled_goes_through_the_startup_task(self):
+        with mock.patch.object(startup, "_set_startup_task", return_value=True) as apply:
+            self.assertTrue(startup.set_enabled(True))
+            apply.assert_called_once_with(True)
+
+    def test_refusal_by_the_user_is_reported_as_failure(self):
+        with mock.patch.object(startup, "_set_startup_task", return_value=False):
+            self.assertFalse(startup.set_enabled(True))      # "disabled by user" in Windows Settings
+
+    def test_winrt_errors_never_escape(self):
+        with mock.patch.object(startup, "_startup_task_enabled", side_effect=OSError("boom")):
+            self.assertFalse(startup.is_enabled())
+        with mock.patch.object(startup, "_set_startup_task", side_effect=OSError("boom")):
+            self.assertFalse(startup.set_enabled(True))
+
+    def test_a_hung_call_times_out(self):
+        with mock.patch.object(startup, "_TASK_TIMEOUT_S", 0.05), \
+                mock.patch.object(startup, "_startup_task_enabled", side_effect=lambda: time.sleep(1)):
+            self.assertFalse(startup.is_enabled())
+
+    def test_refresh_is_a_no_op(self):
+        startup.refresh_if_enabled()                          # would raise if it touched the Run key
 
 
 class AudioDeviceTests(unittest.TestCase):

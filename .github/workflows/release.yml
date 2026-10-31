@@ -94,6 +94,20 @@ jobs:
         run: |
           Compress-Archive -Path 'dist\Bepo\*' -DestinationPath 'dist\Bepo-Windows-Portable.zip' -Force
 
+      # Microsoft Store package. Skipped until the three Partner Center identity values exist as repository
+      # variables (Settings > Secrets and variables > Actions > Variables), so releases keep working without them.
+      # The .msix is unsigned on purpose: Partner Center signs it on submission.
+      - name: Build MSIX package (Microsoft Store)
+        if: ${{ vars.MSIX_IDENTITY_NAME != '' && vars.MSIX_PUBLISHER != '' && vars.MSIX_PUBLISHER_DISPLAY_NAME != '' }}
+        env:
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}
+        run: |
+          $version = (python -c "from version import __version__; print(__version__)").Trim()
+          ./packaging/msix/build_msix.ps1 -Version $version
+          if (-not (Test-Path "dist\Bepo-Store-v$version.msix")) { Write-Error 'MSIX was not created.'; exit 1 }
+
       - name: Install Inno Setup
         run: |
           choco install innosetup --no-progress
@@ -107,7 +121,8 @@ jobs:
 
       - name: Write SHA-256 checksums
         run: |
-          Get-FileHash dist\Bepo-Setup-*.exe, dist\Bepo-Windows-Portable.zip -Algorithm SHA256 |
+          $files = @(Get-ChildItem dist\Bepo-Setup-*.exe, dist\Bepo-Windows-Portable.zip, dist\Bepo-Store-*.msix -ErrorAction SilentlyContinue)
+          $files | Get-FileHash -Algorithm SHA256 |
             ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } |
             Set-Content dist\SHA256SUMS.txt -Encoding ascii
 
@@ -118,6 +133,7 @@ jobs:
           path: |
             dist/Bepo-Setup-*.exe
             dist/Bepo-Windows-Portable.zip
+            dist/Bepo-Store-*.msix
             dist/SHA256SUMS.txt
           if-no-files-found: error
 
@@ -128,6 +144,7 @@ jobs:
           files: |
             dist/Bepo-Setup-*.exe
             dist/Bepo-Windows-Portable.zip
+            dist/Bepo-Store-*.msix
             dist/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -456,7 +456,10 @@ ISCC.exe installer.iss
 
 This outputs `dist\Bepo-Setup-v<version>.exe` (the version comes from [`version.py`](version.py) in CI; pass `/DMyAppVersion=x.y.z` to override it locally) ready for distribution.
 
-Releases are built automatically by GitHub Actions when you push a tag such as `v1.2.0` (the tag must match `version.py`).
+### 3. Microsoft Store package (`.msix`)
+[`packaging/msix/build_msix.ps1`](packaging/msix/build_msix.ps1) packs `dist\Bepo` into `dist\Bepo-Store-v<version>.msix` for Partner Center (unsigned — the Store signs it). Setup, identity values and the submission checklist are in [`packaging/msix/README.md`](packaging/msix/README.md).
+
+Releases are built automatically by GitHub Actions when you push a tag such as `v1.2.1` (the tag must match `version.py`).
 
 Release assets also include a `SHA256SUMS.txt` so you can verify your download.
 

@@ -712,7 +712,8 @@ class BepoApp(QObject):
         if launch_at_startup != startup.is_enabled():
             if not startup.set_enabled(launch_at_startup):
                 self._tray.showMessage(
-                    "Bepo", "Could not change the 'launch at Windows startup' setting.",
+                    "Bepo", "Could not change the 'launch at Windows startup' setting. "
+                            "If it was turned off in Windows Settings > Apps > Startup, turn it on there.",
                     QSystemTrayIcon.MessageIcon.Warning, 8000,
                 )
 
