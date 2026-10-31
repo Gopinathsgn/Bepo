@@ -109,7 +109,6 @@ def _make_tray_icon(active: bool = False) -> QIcon:
         try:
             with open(svg_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            import re
             m = re.search(r'd="([^"]+)"', content)
             if m:
                 path_d = m.group(1)
@@ -183,7 +182,6 @@ class BepoApp(QObject):
         self._session_segments: list[str] = []
         self._session_segment_states: list[tuple] = []   # list state before each segment (for "scratch that")
         self._list = ListState()
-        self._session_segments_count: int = 0
         self._session_handled_segments: int = 0   # utterances processed live (any outcome)
         self._session_had_output: bool = False    # something was typed or a voice command ran
 
@@ -326,7 +324,6 @@ class BepoApp(QObject):
         self._session_segments = []
         self._session_segment_states = []
         self._list.reset()
-        self._session_segments_count = 0
         self._session_handled_segments = 0
         self._session_had_output = False
         self._silence_timer.stop()
@@ -450,7 +447,6 @@ class BepoApp(QObject):
         self._session_segments.append(text)
         self._session_segment_states.append(state_before)
         self._session_injected_text += text
-        self._session_segments_count += 1
         self._session_had_output = True
         self._session_window = foreground_window()
         # Enqueue text for sequential background injection (safe against interleaving)
@@ -497,18 +493,10 @@ class BepoApp(QObject):
                 self._list.restore(self._session_segment_states.pop())
                 chars_to_delete = len(last_chunk)
                 self._session_injected_text = "".join(self._session_segments)
-                self._session_segments_count = len(self._session_segments)
                 enqueue_deletion(chars_to_delete, self._session_injected_text)
                 preview = last_chunk.strip() or "line break"
                 preview = preview[-16:] if len(preview) > 16 else preview
                 self._pill.notify_deleted(f"Deleted \"{preview}\" ⌫")
-                _play_earcon("delete")
-            elif self._session_injected_text:
-                chars_to_delete = len(self._session_injected_text)
-                self._session_injected_text = ""
-                self._session_segments_count = 0
-                enqueue_deletion(chars_to_delete, "")
-                self._pill.notify_deleted("Deleted ⌫")
                 _play_earcon("delete")
 
         elif cmd_type == CommandType.DELETE_WORDS:
@@ -532,7 +520,6 @@ class BepoApp(QObject):
                         self._session_segment_states.clear()
                         if first_state:
                             self._list.restore(first_state)
-                    self._session_segments_count = len(self._session_segments)
                     enqueue_deletion(chars_to_delete, self._session_injected_text)
                     w_str = f"{num_to_drop} word{'s' if num_to_drop > 1 else ''}"
                     self._pill.notify_deleted(f"Deleted {w_str} ⌫")
@@ -546,7 +533,6 @@ class BepoApp(QObject):
                     self._list.restore(self._session_segment_states[0])
                 self._session_segments.clear()
                 self._session_segment_states.clear()
-                self._session_segments_count = 0
                 enqueue_deletion(chars_to_delete, "")
                 self._pill.notify_deleted("Cleared all ⌫")
                 _play_earcon("delete")
@@ -837,8 +823,7 @@ class BepoApp(QObject):
         self._trim_timer.stop()
         self._hotkey.stop()
         self._transcriber.stop_recording()
-        self._transcriber.quit()
-        self._transcriber.wait(2000)
+        self._transcriber.cleanup()      # waits for the stop to finish, then frees mic and model
 
 
 # ------------------------------------------------------------------ #

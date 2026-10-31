@@ -38,6 +38,7 @@ class WaveformWidget(QWidget):
         self._active = False
         self._meter_on = False
         self._meter_ttl = 0
+        self._tick_count = 0
 
         w = BAR_COUNT * BAR_WIDTH + (BAR_COUNT - 1) * BAR_GAP
         self.setFixedSize(w, MAX_HEIGHT)
@@ -95,7 +96,7 @@ class WaveformWidget(QWidget):
             if self._meter_ttl == 0 and not self._active:
                 self._target_heights = [IDLE_HEIGHT] * BAR_COUNT
         if self._active:
-            self._tick_count = getattr(self, "_tick_count", 0) + 1
+            self._tick_count += 1
             # Periodically refresh speech waveform targets
             if self._tick_count % 3 == 0:
                 self._randomize_targets()

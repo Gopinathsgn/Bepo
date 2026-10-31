@@ -225,11 +225,17 @@ class PillWindow(QWidget):
         self._slide_out.setEasingCurve(QEasingCurve.Type.InCubic)
         self._slide_out.finished.connect(self._on_slide_out_done)
 
+        # One hide timer for DONE / ERROR: a new dictation cancels it (see show_listening)
+        self._hide_timer = QTimer(self)
+        self._hide_timer.setSingleShot(True)
+        self._hide_timer.timeout.connect(self._slide_to_hide)
+
     # ------------------------------------------------------------------ #
     # Public API                                                           #
     # ------------------------------------------------------------------ #
 
     def show_listening(self, subtitle: str = "Listening"):
+        self._hide_timer.stop()      # a hide scheduled by the previous dictation must not hit this one
         self._set_state(PillState.LISTENING)
         self._status_label.setText(subtitle)
         self._text_label.setText("")
@@ -284,13 +290,19 @@ class PillWindow(QWidget):
         preview = text[-34:] if len(text) > 34 else text
         self._text_label.setText(preview)
         self._hint_badge.hide()
-        QTimer.singleShot(750, self._slide_to_hide)
+        self._hide_timer.start(750)
 
     def show_error(self, msg: str = "No speech detected"):
         self._set_state(PillState.ERROR)
-        self._text_label.setText(msg)
+        if msg != "No speech detected":
+            self._status_label.setText("Error")
+        # Elide instead of letting a long message be cut off by the label's fixed width
+        metrics = self._text_label.fontMetrics()
+        self._text_label.setText(
+            metrics.elidedText(" ".join(msg.split()), Qt.TextElideMode.ElideRight, self._text_label.maximumWidth())
+        )
         self._hint_badge.hide()
-        QTimer.singleShot(1500, self._slide_to_hide)
+        self._hide_timer.start(1500)
 
     # ------------------------------------------------------------------ #
     # Internal helpers                                                     #
@@ -313,6 +325,7 @@ class PillWindow(QWidget):
 
     def _slide_to(self, show: bool):
         anim = self._slide_in if show else self._slide_out
+        (self._slide_out if show else self._slide_in).stop()     # never animate "pos" twice at once
         if show:
             self._recalculate_positions()
             self.move(self._hidden_pos)
@@ -322,7 +335,8 @@ class PillWindow(QWidget):
         anim.start()
 
     def _slide_to_hide(self):
-        self._slide_to(show=False)
+        if self._state in (PillState.DONE, PillState.ERROR):
+            self._slide_to(show=False)
 
     def _on_slide_out_done(self):
         self.hide()

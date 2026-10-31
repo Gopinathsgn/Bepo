@@ -56,6 +56,7 @@ class TranscriberThread(QObject):
         # last words must still be emitted.
         self._recording = False
         self._stopping = False
+        self._stop_thread: threading.Thread | None = None
         self._completed_lines: list[str] = []
         self._current_partial: str = ""
         self._lock = threading.Lock()
@@ -183,7 +184,8 @@ class TranscriberThread(QObject):
             return
 
         self._stopping = True
-        threading.Thread(target=self._async_stop, daemon=True, name="TranscriberStop").start()
+        self._stop_thread = threading.Thread(target=self._async_stop, daemon=True, name="TranscriberStop")
+        self._stop_thread.start()
 
     def _release_session(self):
         """Close the dictation session, which releases the microphone (the model stays loaded)."""
@@ -244,7 +246,10 @@ class TranscriberThread(QObject):
             self._reload()
 
     def cleanup(self):
-        """Release audio devices and model resources."""
+        """Release audio devices and model resources (waits briefly for a dictation that is still stopping)."""
+        stop_thread = self._stop_thread
+        if stop_thread is not None and stop_thread is not threading.current_thread():
+            stop_thread.join(timeout=3)      # it is still flushing audio through the model
         self._recording = False
         self._stopping = False
         self._release_session()
@@ -253,14 +258,6 @@ class TranscriberThread(QObject):
             self._ready = False
         if model is not None:
             self._close_engine(model)
-
-    def quit(self):
-        """Compatibility shim for QThread callers."""
-        self.cleanup()
-
-    def wait(self, ms: int = 0):
-        """Compatibility shim for QThread callers."""
-        pass
 
     # ------------------------------------------------------------------ #
     # Moonshine callbacks (fire on Moonshine worker thread)              #

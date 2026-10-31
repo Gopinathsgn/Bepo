@@ -148,7 +148,6 @@ class HotkeyManager(QObject):
     esc_pressed        = Signal()
     undo_activated     = Signal()
     registration_issue = Signal(str)
-    activated          = toggle_activated   # backward compatibility alias
 
     def __init__(self, parent=None, toggle: str | None = DEFAULT_TOGGLE,
                  ptt: str | None = DEFAULT_PTT, undo: str | None = DEFAULT_UNDO):
@@ -320,8 +319,8 @@ class HotkeyManager(QObject):
                 else:
                     self._issues.append(
                         f"Could not register the toggle shortcut '{self._toggle.text}' - "
-                        "another app may be using it. Change \"hotkey_toggle\" in the settings file "
-                        "(tray menu > Open Settings File) or start dictation from the tray menu."
+                        "another app may be using it. Choose another one in Settings "
+                        "(tray menu > Settings) or start dictation from the tray menu."
                     )
 
             if self._ptt is not None:
@@ -335,8 +334,7 @@ class HotkeyManager(QObject):
                 else:
                     self._issues.append(
                         f"Could not register the push-to-talk shortcut '{self._ptt.text}' - "
-                        "another app may be using it. Change \"hotkey_ptt\" in the settings file "
-                        "(tray menu > Open Settings File)."
+                        "another app may be using it. Choose another one in Settings (tray menu > Settings)."
                     )
 
             if self._undo is not None:
@@ -350,7 +348,7 @@ class HotkeyManager(QObject):
                 else:
                     self._issues.append(
                         f"Could not register the undo shortcut '{self._undo.text}' - "
-                        "another app may be using it. Change it in Settings."
+                        "another app may be using it. Choose another one in Settings (tray menu > Settings)."
                     )
         finally:
             self._ready_event.set()

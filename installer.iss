@@ -28,6 +28,8 @@ SolidCompression=yes
 WizardStyle=modern
 LicenseFile=LICENSE
 PrivilegesRequired=lowest
+; Same name as core/bootstrap.py MUTEX_NAME: Setup/Uninstall notice a running Bepo (a tray app) and ask to close it
+AppMutex=Bepo_AI_Voice_Typing_SingleInstance_Mutex
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -42,6 +44,10 @@ Source: "dist\Bepo\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs cre
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+[Registry]
+; "Start Bepo when I sign in" (core/startup.py) writes this value; remove it when Bepo is uninstalled
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Bepo"; Flags: dontcreatekey uninsdeletevalue
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
