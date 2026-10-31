@@ -15,7 +15,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QCheckBox, QComboBox,
-    QPlainTextEdit, QScrollArea, QWidget, QFrame, QProgressBar,
+    QPlainTextEdit, QWidget, QFrame, QProgressBar,
 )
 from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtGui import QIcon, QGuiApplication
@@ -26,6 +26,7 @@ from core.hotkey import parse_hotkey
 from setup.model_downloader import MODELS, is_model_downloaded
 from ui.about_dialog import AboutDialog
 from ui.setup_screen import DownloadThread, breakable
+from ui.smooth_scroll import SmoothScrollArea
 
 IS_WINDOWS_11 = sys.platform == "win32" and hasattr(sys, "getwindowsversion") and sys.getwindowsversion().build >= 22000
 
@@ -82,7 +83,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 """
 
 
-def _stylesheet() -> str:
+def stylesheet() -> str:
     return (_QSS
             .replace("@CHECK@", (_ASSETS / "check.svg").as_posix())
             .replace("@CHEVRON@", (_ASSETS / "chevron-down.svg").as_posix()))
@@ -235,7 +236,7 @@ class SettingsDialog(QDialog):
 
         self.setWindowTitle("Bepo Settings")
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowCloseButtonHint)
-        self.setStyleSheet(_stylesheet())
+        self.setStyleSheet(stylesheet())
         icon_path = _ASSETS / "icon.png"
         if icon_path.exists():
             self.setWindowIcon(QIcon(str(icon_path)))
@@ -303,7 +304,7 @@ class SettingsDialog(QDialog):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
-        scroll = QScrollArea()
+        scroll = SmoothScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)

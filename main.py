@@ -35,6 +35,7 @@ from core.cleaner import clean_transcript
 from core.commands import CommandType, parse_voice_command
 from core.formatting import BULLETS, NUMBERED, FormatCommand, ListState, parse_format_command
 from core.hotkey import HotkeyManager, DEFAULT_TOGGLE, DEFAULT_PTT, DEFAULT_UNDO
+from ui.help_dialog import HelpDialog, HelpState
 from ui.pill import PillWindow
 from ui.setup_screen import SetupScreen
 from ui.settings_dialog import SettingsDialog
@@ -167,6 +168,7 @@ class BepoApp(QObject):
         self._last_partial: str = ""
         self._has_spoken: bool = False
         self._settings_dialog = None
+        self._help_dialog = None
         self._history: deque[str] = deque(maxlen=HISTORY_SIZE)
         self._history_menu = None
         self._session_window: int = 0                        # window the latest segment was typed into
@@ -239,21 +241,12 @@ class BepoApp(QObject):
         # Start hotkey listener
         self._hotkey.start()
 
-    def show_welcome_once(self):
-        """First launch only: show the pill with the shortcuts so the user knows how to start."""
+    def show_help_once(self):
+        """First launch only: open the Help window so the user learns the shortcuts and commands."""
         marker = app_config.APP_DATA_DIR / "welcomed"
         if marker.exists():
             return
-        toggle = self._hotkey.toggle_label
-        ptt = self._hotkey.ptt_label
-        if toggle:
-            stop = "Esc" if self._esc_to_finish else toggle
-            text = f"{toggle} to start · {stop} to stop"
-        elif ptt:
-            text = f"Hold {ptt} and speak"
-        else:
-            text = "Start from the tray icon"
-        QTimer.singleShot(600, lambda: self._pill.show_welcome(text))
+        QTimer.singleShot(600, self._show_help)
         try:
             marker.parent.mkdir(parents=True, exist_ok=True)
             marker.write_text("1", encoding="utf-8")
@@ -714,6 +707,8 @@ class BepoApp(QObject):
             self._hotkey.reconfigure(*(config[k] for k in keys))
         self._transcriber.apply_settings(EngineSettings.from_config(config))
         self._update_tray_state(recording=self._recording)
+        if self._help_dialog is not None and self._help_dialog.isVisible():
+            self._help_dialog.set_state(self._help_state())
 
         try:
             app_config.save_user_config(config)
@@ -751,6 +746,23 @@ class BepoApp(QObject):
         dialog.show()
         dialog.raise_()
         dialog.activateWindow()
+
+    def _help_state(self) -> HelpState:
+        return HelpState(
+            config=self._config,
+            toggle=self._hotkey.toggle_label,
+            ptt=self._hotkey.ptt_label,
+            undo=self._hotkey.undo_label,
+        )
+
+    def _show_help(self):
+        if self._help_dialog is not None and self._help_dialog.isVisible():
+            self._help_dialog.set_state(self._help_state())
+        else:
+            self._help_dialog = HelpDialog(self._help_state())
+        self._help_dialog.show()
+        self._help_dialog.raise_()
+        self._help_dialog.activateWindow()
 
     # ------------------------------------------------------------------ #
     # System tray                                                          #
@@ -802,6 +814,10 @@ class BepoApp(QObject):
         self._history_menu = menu.addMenu("🕘  Recent dictations")
         self._history_menu.aboutToShow.connect(self._rebuild_history_menu)
         self._history_menu.menuAction().setVisible(self._keep_history)
+
+        help_action = QAction("📖  Help", self._app)
+        help_action.triggered.connect(self._show_help)
+        menu.addAction(help_action)
 
         settings_action = QAction("⚙️  Settings", self._app)
         settings_action.triggered.connect(self._show_settings)
@@ -860,7 +876,7 @@ def main():
     def launch_main_app():
         app._controller = BepoApp(app, preload=_PRELOAD)
         app.aboutToQuit.connect(app._controller.cleanup)
-        app._controller.show_welcome_once()
+        app._controller.show_help_once()
 
     if not is_model_downloaded(config["speech_model"]):
         setup = SetupScreen(config["speech_model"])

@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 _app = QApplication.instance() or QApplication([])
@@ -66,6 +67,7 @@ class FakeHotkey(QObject):
         super().__init__(parent)
         self.toggle_label = "Ctrl+Win"
         self.ptt_label = "Ctrl+Space"
+        self.undo_label = "Alt+Win+Z"
         self.reconfigured = []
         self.calls = []
 
@@ -437,6 +439,65 @@ class SessionFlowTests(unittest.TestCase):
         suspend()
         resume()
         self.assertEqual(self.ctrl._hotkey.calls, ["suspend", "resume"])
+
+    # Help window -----------------------------------------------------------
+    def _fake_help(self):
+        created = []
+
+        class FakeHelp:
+            def __init__(self, state):
+                created.append(self)
+                self.states, self.shown, self.visible = [state], 0, False
+
+            def isVisible(self):
+                return self.visible
+
+            def set_state(self, state):
+                self.states.append(state)
+
+            def show(self):
+                self.shown += 1
+                self.visible = True
+
+            def raise_(self):
+                pass
+
+            def activateWindow(self):
+                pass
+
+        return created, mock.patch.object(self.main, "HelpDialog", FakeHelp)
+
+    def test_tray_menu_has_help(self):
+        texts = [a.text() for a in self.ctrl._tray.contextMenu().actions()]
+        self.assertTrue(any("Help" in t for t in texts))
+
+    def test_help_opens_once_with_the_live_shortcuts_and_settings(self):
+        created, patch = self._fake_help()
+        with patch:
+            self.ctrl._show_help()
+            self.ctrl._show_help()                    # second click re-uses the open window
+        self.assertEqual(len(created), 1)
+        state = created[0].states[0]
+        self.assertEqual((state.toggle, state.ptt, state.undo), ("Ctrl+Win", "Ctrl+Space", "Alt+Win+Z"))
+        self.assertIs(state.config, self.ctrl._config)
+
+    def test_help_follows_changed_settings_while_open(self):
+        created, patch = self._fake_help()
+        with patch:
+            self.ctrl._show_help()
+            self.ctrl.apply_settings(dict(self.ctrl._config, voice_formatting=False))
+        self.assertEqual(len(created[0].states), 2)
+        self.assertFalse(created[0].states[-1].config["voice_formatting"])
+
+    def test_first_run_opens_help_once_and_never_shows_the_pill_welcome(self):
+        created, patch = self._fake_help()
+        with tempfile.TemporaryDirectory() as folder, patch,                 mock.patch.object(self.main.app_config, "APP_DATA_DIR", Path(folder)):
+            self.ctrl.show_help_once()
+            self.assertTrue((Path(folder) / "welcomed").exists())
+            self.ctrl.show_help_once()                # second launch: marker exists
+            QTest.qWait(900)
+        self.assertEqual(len(created), 1)
+        self.assertNotIn("show_welcome", self.pill.names())
 
 
     # smart formatting, window guard, undo, history, microphone hint ------

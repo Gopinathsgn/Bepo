@@ -72,7 +72,7 @@ Unlike traditional cloud voice assistants, Bepo runs **Moonshine AI's quantized 
 | 🔄 **Continuous Dictation** | Streams and types sentence-by-sentence live into your active app without cutting off when you pause to think. |
 | ⌫ **Voice Deletion Commands** | Speak commands like *"Scratch that"*, *"Delete last word"*, or *"Clear all"* to instantly erase typed words. |
 | ↶ **Undo Shortcut** | Press `Alt + Win + Z` to delete everything your last dictation typed — handy after you have already stopped. |
-| 👋 **First-Run Welcome** | The first time Bepo starts, the pill pops up once and shows how to start and stop dictating. |
+| ❓ **Built-in Help** | **Tray → Help** lists every shortcut (your own, if you changed them) and every voice command with examples, and has a *Try it* box to practise in. It opens by itself the first time Bepo starts. |
 | 🎙️ **Dual Input Modes** | **Toggle Mode** (`Ctrl + Win`) for hands-free streaming and **Push-to-Talk** (`Ctrl + Space`) for quick replies. |
 | 🧹 **Filler Word Filter** | Automatically scrubs vocal hesitations (`um`, `uh`, `erm`, `er`, `ah`, `hmm`) for clean, professional transcripts. |
 | 🔢 **Smart Formatting** | *"comma"*, *"question mark"*, *"open quote"* become punctuation; *"twenty five"* → 25, *"fifty percent"* → 50%, *"jane at gmail dot com"* → jane@gmail.com. Small numbers (one–ten) stay words. Turn it off in Settings. |
@@ -328,6 +328,7 @@ bepo/
 │   ├── commands.py          # Voice deletion & editing command parser ("Scratch that", etc.)
 │   ├── config.py            # Settings: defaults, validation, load/save (pure Python)
 │   ├── emoji.py             # Spoken emoji parser (100+ native Unicode glyphs)
+│   ├── guide.py             # What the Help window teaches (shortcuts, phrases, examples; no Qt)
 │   ├── formatting.py        # "New line", "Numbered list", "Next item" ... (layout commands + list state)
 │   ├── engine.py            # Loads the Moonshine model, opens per-dictation mic sessions
 │   ├── hotkey.py            # Configurable Win32 RegisterHotKey shortcuts (toggle, push-to-talk, undo) & PTT release watcher
@@ -337,8 +338,10 @@ bepo/
 │   └── transcriber.py       # Moonshine MicTranscriber lifecycle & signal marshaling
 ├── ui/
 │   ├── about_dialog.py      # Credits & license notice dialog
+│   ├── help_dialog.py       # Help window: shortcuts, voice commands and a Try-it box
 │   ├── pill.py              # Floating glass overlay with animations (never steals focus)
 │   ├── settings_dialog.py   # Settings window (shortcut recorder, model download, ...)
+│   ├── smooth_scroll.py     # Scroll area with eased mouse-wheel scrolling (Settings, Help)
 │   ├── setup_screen.py      # First-run setup window with Mica/Acrylic effects
 │   └── waveform.py          # 7-bar speech indicator
 ├── setup/
