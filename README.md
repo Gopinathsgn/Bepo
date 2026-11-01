@@ -37,6 +37,12 @@
 </p>
 
 <p align="center">
+  <a href="https://apps.microsoft.com/detail/9N56QGR4LMCN"><img src="https://img.shields.io/badge/Get%20it%20from-Microsoft%20Store-0078D6?style=for-the-badge&logo=microsoft&logoColor=white" alt="Get Bepo from the Microsoft Store"></a>
+  &nbsp;
+  <a href="https://github.com/Gopinathsgn/bepo/releases/latest"><img src="https://img.shields.io/badge/Download-GitHub%20Releases-181717?style=for-the-badge&logo=github&logoColor=white" alt="Download Bepo from GitHub Releases"></a>
+</p>
+
+<p align="center">
   <img src="assets/demo.gif" alt="Bepo typing 'Blazing fast offline voice typing for windows' into a note while the floating pill shows the live transcript" width="640">
   <br>
   <sub>Press <code>Ctrl + Win</code>, speak, and Bepo types at your cursor while the pill streams the transcript live.</sub>
@@ -139,9 +145,11 @@ Because Bepo is a background tool for ordinary laptops. It has to sit in your tr
 
 ## 🚀 Quick Start
 
+> 📥 **Download Bepo:** [**Microsoft Store**](https://apps.microsoft.com/detail/9N56QGR4LMCN) (automatic updates) or [**GitHub Releases**](https://github.com/Gopinathsgn/bepo/releases/latest) (installer and zip).
+
 ### Option A: Standalone Installer (Recommended)
 
-1. Download the latest `Bepo-Setup-v<version>.exe` from the [Releases](../../releases) tab.
+1. Download the latest `Bepo-Setup-v<version>.exe` from the [Releases](https://github.com/Gopinathsgn/bepo/releases/latest) tab, or install Bepo from the [Microsoft Store](https://apps.microsoft.com/detail/9N56QGR4LMCN) and skip to step 3.
 2. Run the installer (installs into `%LOCALAPPDATA%`, **no Admin rights required**).
 3. Launch Bepo from the Start Menu or Desktop shortcut.
 4. Bepo greets you with the pill on first launch, showing how to start and stop. Press `Ctrl + Win` (or hold `Ctrl + Space`) to begin dictating!
